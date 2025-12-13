@@ -21,7 +21,7 @@ pub(super) fn mechanism_name(mechanism: &Mechanism) -> &'static str {
     }
 }
 
-pub(super) fn find_token_slot(pkcs11: &Pkcs11, label: &str) -> anyhow::Result<Slot> {
+pub fn find_token_slot(pkcs11: &Pkcs11, label: &str) -> anyhow::Result<Slot> {
     debug!("→ Calling C_GetSlotList to find token");
     let slots = pkcs11.get_slots_with_token()?;
     

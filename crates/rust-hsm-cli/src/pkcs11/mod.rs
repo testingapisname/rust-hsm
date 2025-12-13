@@ -6,3 +6,4 @@ pub mod objects;
 pub mod slots;
 pub mod token;
 pub mod random;
+pub mod benchmark;

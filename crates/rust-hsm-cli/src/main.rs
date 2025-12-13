@@ -502,6 +502,21 @@ enum Commands {
         #[arg(long)]
         hex: bool,
     },
+
+    /// Run comprehensive performance benchmarks
+    Benchmark {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        /// Number of iterations per test
+        #[arg(long, default_value = "100")]
+        iterations: usize,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -796,6 +811,16 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::GenRandom { bytes, output, hex } => {
             pkcs11::random::generate_random(&module_path, bytes, output.as_ref(), hex)?;
+        }
+        Commands::Benchmark { label, user_pin, iterations, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::benchmark::run_full_benchmark(&module_path, &token_label, &user_pin_value, iterations)?;
         }
     }
 
