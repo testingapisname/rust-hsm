@@ -2,88 +2,333 @@
 
 ## Project Overview
 
-This is a Rust PKCS#11 tool for interfacing with SoftHSM2 in a single Docker container. The container includes both SoftHSM2 and the Rust CLI, with the CLI loading the PKCS#11 module directly via `cryptoki`.
+A Rust PKCS#11 CLI tool for interfacing with **SoftHSM2** in a single Docker container. Provides repeatable HSM-style workflows for token management, asymmetric/symmetric key operations, signing, encryption, key wrapping, and CSR generation. This is a learning tool - not for production security.
 
-## Architecture
+## Architecture & Key Insight
 
-- **Single container**: Contains both SoftHSM2 and Rust CLI
-- **Direct PKCS#11 access**: Rust CLI loads `libsofthsm2.so` locally using `cryptoki` crate
-- **Token storage**: Persistent via Docker volume mounted at `/tokens`
+**Single-container design**: Both SoftHSM2 and Rust CLI run in the same container. The CLI loads `libsofthsm2.so` directly via the `cryptoki` crate (NOT calling external `pkcs11-tool` commands).
+
+```
+┌───────────────────────────────┐
+│     rust-hsm-app container    │
+│  ┌─────────────────────────┐  │
+│  │  rust-hsm-cli binary    │  │
+│  │  (loads libsofthsm2.so) │  │
+│  └──────────┬──────────────┘  │
+│             │ cryptoki FFI    │
+│  ┌──────────▼──────────────┐  │
+│  │  SoftHSM2 (PKCS#11)     │  │
+│  │  /usr/lib/softhsm/      │  │
+│  └──────────┬──────────────┘  │
+│             │                 │
+│  ┌──────────▼──────────────┐  │
+│  │  Token Storage          │  │
+│  │  /tokens (volume)       │  │
+│  └─────────────────────────┘  │
+└───────────────────────────────┘
+```
+
+**Token persistence**: Docker volume at `/tokens` survives container restarts. Wipe with `docker volume rm rust-hsm_tokens`.
 
 ## Tech Stack
 
-- **Rust crate**: `cryptoki` for PKCS#11 bindings (not native bindings)
-- **CLI framework**: `clap` with subcommands
-- **Logging**: `tracing` + `tracing-subscriber`
-- **Build**: Multi-stage Dockerfile (builder + slim runtime)
+- **PKCS#11 bindings**: `cryptoki` v0.10 (type-safe Rust wrapper, not raw FFI)
+- **CLI**: `clap` v4.5 with derive macros and subcommands
+- **Logging**: `tracing` + `tracing-subscriber` with env-filter (use `RUST_LOG=debug`)
+- **Crypto libraries**: `sha2`, `simple_asn1`, `num-bigint` for data format conversions
+- **Container**: Multi-stage Dockerfile (Rust 1.83 builder → Debian Bookworm Slim runtime)
 
-## File Structure (Target)
+## Critical Code Structure
 
 ```
-docker/
-  Dockerfile             # Single container with SoftHSM2 + Rust CLI
-  softhsm2.conf          # SoftHSM configuration
-  entrypoint.sh          # Container startup script
-compose.yaml             # Optional: for easy container management
-crates/rust-hsm-cli/     # Rust CLI crate
-  src/pkcs11/            # PKCS#11 wrapper modules (session, objects, keys, errors)
+crates/rust-hsm-cli/src/
+  main.rs                   # CLI entry, subcommand dispatch, PIN input handling
+  pkcs11/
+    mod.rs                  # Module exports (thin layer)
+    errors.rs               # Custom Pkcs11Error type wrapping cryptoki::error::Error
+    info.rs                 # Module/slot information commands
+    slots.rs                # Slot enumeration
+    token.rs                # Token init, PIN setup
+    objects.rs              # Object listing
+    keys/
+      mod.rs                # Re-exports all key operations
+      utils.rs              # Shared helpers: find_token_slot, mechanism_name, get_key_type
+      keypair.rs            # RSA/ECDSA key generation
+      asymmetric.rs         # Sign/verify/encrypt/decrypt (RSA & ECDSA)
+      symmetric.rs          # AES key gen, AES-GCM encrypt/decrypt
+      export.rs             # PEM export for public keys
+      wrap.rs               # AES Key Wrap (RFC 3394)
+      csr.rs                # X.509 CSR generation
 ```
-
-## Key Environment Variables
-
-- `PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so` (path to PKCS#11 module)
-- `SOFTHSM2_CONF=/etc/softhsm2.conf` (SoftHSM configuration file)
-- `TOKEN_LABEL`, `USER_PIN`, `SO_PIN` (never hardcode PINs in code)
 
 ## Development Workflow
 
-1. **Build and run**: `docker compose up -d` or `docker run -v tokens:/tokens rust-hsm`
-2. **Run CLI commands**: `docker compose exec app rust-hsm-cli <command>` or exec into container
-3. **Wipe token state**: `docker volume rm rust-hsm_tokens`
-
-## Commands (CLI Interface)
-
+### Build & Run
 ```bash
-rust-hsm-cli info                         # Module/token info
-rust-hsm-cli list-slots                   # Enumerate slots and tokens
-rust-hsm-cli init-token --label "..." --so-pin "..." --user-pin "..."
-rust-hsm-cli list-objects --label "..." --user-pin "..."
-rust-hsm-cli gen-keypair --label "..." --key-label "..." --type rsa --bits 2048
-rust-hsm-cli sign --key-label "..." --in data.bin --out sig.bin
-rust-hsm-cli verify --pubkey pub.pem --in data.bin --sig sig.bin
+docker compose up -d --build          # Rebuild after code changes
+docker exec rust-hsm-app rust-hsm-cli info
 ```
 
-## Implementation Guidelines
+### Testing
+```bash
+docker exec rust-hsm-app /app/test.sh  # Run full integration test suite (24 tests)
+```
 
-### PKCS#11 Session Lifecycle
-Always follow: init → open session → login → operation → logout → close
+### Reset Token State
+```bash
+docker compose down
+docker volume rm rust-hsm_tokens
+docker compose up -d
+```
+
+## PKCS#11 Patterns (Critical for AI Agents)
+
+### Session Lifecycle (Always Follow)
+
+Every function follows this pattern (see [symmetric.rs](../crates/rust-hsm-cli/src/pkcs11/keys/symmetric.rs#L23-L70)):
+```rust
+let pkcs11 = Pkcs11::new(module_path)?;
+debug!("→ Calling C_Initialize");
+pkcs11.initialize(CInitializeArgs::OsThreads)?;
+
+let slot = find_token_slot(&pkcs11, label)?;
+debug!("→ Calling C_OpenSession");
+let session = pkcs11.open_rw_session(slot)?; // or open_ro_session for read-only
+
+debug!("→ Calling C_Login");
+session.login(UserType::User, Some(&pin))?;
+
+// ... perform operations ...
+
+debug!("→ Calling C_Logout");
+session.logout()?;
+debug!("→ Calling C_Finalize");
+pkcs11.finalize();
+```
+
+**Why this matters**: PKCS#11 is stateful. Skipping finalize causes resource leaks. Logging C_ function names helps debug SoftHSM issues.
+
+### Logging Convention (MANDATORY)
+
+Use three-level logging with `tracing`:
+- `info!()` - Major milestones: "Signing data with key 'X' on token 'Y'"
+- `debug!()` - PKCS#11 calls: `debug!("→ Calling C_GenerateKey")`
+- `trace!()` - Raw data: `trace!("Hash value: {:02x?}", &hash)`
+
+**Pattern**: Always log the PKCS#11 C_ function name before calling it. Use [mechanism_name()](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs#L10-L21) to log mechanism types (e.g., "CKM_SHA256_RSA_PKCS").
+
+### Key Type Differences (Asymmetric Signing)
+
+**RSA**: Mechanism does hashing internally
+```rust
+let mechanism = Mechanism::Sha256RsaPkcs; // CKM_SHA256_RSA_PKCS
+let signature = session.sign(&mechanism, key_handle, &data)?; // Pass raw data
+```
+
+**ECDSA**: Must hash data manually before signing
+```rust
+let mechanism = Mechanism::Ecdsa; // CKM_ECDSA
+use sha2::{Sha256, Digest};
+let hash = Sha256::digest(&data);
+let signature = session.sign(&mechanism, key_handle, &hash)?; // Pass hash, not raw data
+```
+
+See [asymmetric.rs](../crates/rust-hsm-cli/src/pkcs11/keys/asymmetric.rs#L57-L70) for the detection logic.
+
+### AES-GCM Format Convention
+
+Encrypted files have this structure (implemented in [symmetric.rs](../crates/rust-hsm-cli/src/pkcs11/keys/symmetric.rs)):
+```
+[12-byte IV][16-byte auth tag][ciphertext]
+```
+
+**IV**: Random 96 bits, generated per encryption, prepended to output.  
+**Auth Tag**: 128 bits, appended by PKCS#11, stored with ciphertext.
 
 ### Security Rules
-- Never hardcode PINs in code (read from env/args)
-- Never log PIN values
-- Always print PKCS#11 return codes on error
-- Consider `--pin-stdin` for safer automation
 
-### Incremental Development
-Implement in this order:
-1. **Read-only commands first**: `info`, `list-slots`, `list-objects`
-2. **Then mutation commands**: `init-token`, `gen-keypair`, `sign`, `verify`
+- **Never log PINs**: Use `debug!("User PIN: ***hidden***")` if mentioning PINs
+- **Never hardcode PINs**: Always read from args/stdin (see `--pin-stdin` support in [main.rs](../crates/rust-hsm-cli/src/main.rs#L8-L14))
+- **Mark keys as sensitive**: `Attribute::Sensitive(true)` for private/secret keys
+- **Non-extractable by default**: Symmetric keys use `Attribute::Extractable(false)` unless `--extractable` flag
 
-### Error Handling
-- Wrap `cryptoki` errors with context
-- Use `src/pkcs11/errors.rs` for custom error types
-- Print clear error messages with PKCS#11 return codes
+## Common Tasks for AI Agents
 
-## Testing Strategy
+### Adding a New Command
 
-Run integration tests in container:
-```bash
-docker compose up -d
-docker compose exec app rust-hsm-cli list-slots
-# Test full workflow: init → keygen → sign → verify
+1. Add variant to `Commands` enum in [main.rs](../crates/rust-hsm-cli/src/main.rs#L23)
+2. Implement function in appropriate `pkcs11/keys/*.rs` module
+3. Add export to [pkcs11/keys/mod.rs](../crates/rust-hsm-cli/src/pkcs11/keys/mod.rs)
+4. Add match arm in `main()` to dispatch to your function
+5. Add test case to [test.sh](../test.sh) if it's a core operation
+
+### Finding Keys by Label
+
+Use the pattern from [utils.rs](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs#L38-L49):
+```rust
+let template = vec![
+    Attribute::Class(ObjectClass::PrivateKey), // or PublicKey, SecretKey
+    Attribute::Label(key_label.as_bytes().to_vec()),
+];
+let key_handle = session.find_objects(&template)?.first().copied()
+    .ok_or_else(|| anyhow::anyhow!("Key '{}' not found", key_label))?;
 ```
 
-Token storage persists via volume—test repeatability by wiping and recreating:
+### Determining Mechanism Types
+
+Check [utils.rs mechanism_name()](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs#L10-L21) for supported mechanisms. When adding new mechanisms:
+1. Use the `cryptoki::mechanism::Mechanism` enum variant (NOT raw CKM_ constants)
+2. Add logging case to `mechanism_name()` helper
+3. Document which PKCS#11 operation it's used for (sign, encrypt, wrap, etc.)
+
+**Note**: `cryptoki` v0.6 lacks some mechanisms like AES-CMAC. See [docs/IMPLEMENTING_AES_CMAC.md](../docs/IMPLEMENTING_AES_CMAC.md) for workarounds.
+
+## Testing & Debugging
+
+### Run Full Test Suite
 ```bash
+docker exec rust-hsm-app /app/test.sh  # 24 tests: RSA, ECDSA, AES, wrap/unwrap, CSR
+```
+
+### Debug Mode
+```bash
+RUST_LOG=debug docker exec rust-hsm-app rust-hsm-cli gen-keypair \
+  --label DEV_TOKEN --user-pin 123456 --key-label test --key-type rsa
+```
+
+### Common Issues
+
+**"Token not found"**: Token might be in different slot. Run `list-slots` to see all tokens.  
+**"CKR_PIN_INCORRECT"**: Check PIN with `list-objects` first. SoftHSM locks after 3 failures.  
+**"Key not found"**: Use `list-objects` to see all objects on token - keys might have different label.  
+**Slot allocation**: SoftHSM picks the next available slot. If slot 0 is occupied, it uses slot 1, 2, etc.
+
+### Reset Everything
+```bash
+docker compose down
 docker volume rm rust-hsm_tokens
+docker compose up -d --build
 ```
+
+## Known Limitations & Future Work
+
+### Current Limitations
+
+**1. `cryptoki` v0.10 Mechanism Coverage**
+- **Missing**: AES-CMAC (`CKM_AES_CMAC`, `CKM_AES_CMAC_GENERAL`) - check if newer versions support this
+- **Missing**: HMAC operations (SHA-256/SHA-384/SHA-512 HMAC)
+- **Missing**: Raw RSA operations (OAEP padding, PSS signatures)
+- **Missing**: Key derivation functions (PBKDF2, HKDF)
+- **Note**: Upgraded from v0.6 - `GcmParams::new()` now returns `Result` and requires mutable IV reference
+
+**2. Asymmetric Crypto Constraints**
+- **RSA encryption size limit**: 245 bytes for 2048-bit keys, 501 bytes for 4096-bit keys (PKCS#1 v1.5 overhead)
+- **No RSA-OAEP**: Only PKCS#1 v1.5 padding supported (`CKM_RSA_PKCS`)
+- **Limited curves**: Only P-256 and P-384 ECDSA curves (no P-521, Ed25519, X25519)
+- **No ECDH**: Key agreement not implemented
+
+**3. Key Management**
+- **No key attributes inspection**: Can't query key size, usage flags, or extractability after creation
+- **No bulk operations**: Must delete keys one at a time
+- **No key backup/restore**: Except via wrap/unwrap (requires extractable keys)
+
+**4. Token Management**
+- **Single token operations**: Commands operate on one token at a time
+- **No SO PIN management**: Can't change SO PIN after initialization
+- **Manual slot selection**: SoftHSM auto-assigns slots; can't force specific slot numbers
+
+**5. Security Limitations (SoftHSM)**
+- **Software-backed**: No hardware security module protection
+- **Keys on disk**: Token storage at `/tokens` is just encrypted files
+- **Not for production**: Educational/testing tool only
+
+### Planned Future Work
+
+**High Priority**
+1. **MAC Operations** (see [IMPLEMENTING_AES_CMAC.md](../docs/IMPLEMENTING_AES_CMAC.md))
+   - Generate/verify MACs with AES-CMAC or HMAC-SHA256
+   - Commands: `gen-mac`, `verify-mac`
+   - Use case: API authentication, message integrity
+
+2. **Key Attribute Inspection**
+   ```bash
+   rust-hsm-cli inspect-key --label TOKEN --user-pin PIN --key-label KEY
+   # Output: key type, size, extractable, usage flags, creation date
+   ```
+
+3. **Batch Operations**
+   ```bash
+   rust-hsm-cli delete-all-keys --label TOKEN --user-pin PIN --pattern "temp-*"
+   rust-hsm-cli list-keys --label TOKEN --user-pin PIN --format json
+   ```
+
+4. **RSA-OAEP Support**
+   - Larger payload encryption (up to key_size - 66 bytes for SHA-256)
+   - Stronger security than PKCS#1 v1.5
+   - Requires `cryptoki` enum extension or raw mechanism
+
+5. **Additional Curves**
+   - P-521 for ECDSA
+   - Curve25519 (Ed25519 signatures, X25519 ECDH)
+   - Check `cryptoki` version support
+
+**Medium Priority**
+6. **Key Derivation Functions**
+   - PBKDF2 for password-based key derivation
+   - HKDF for key stretching
+   - Useful for deriving encryption keys from passwords
+
+7. **Session Management**
+   - Persistent sessions (avoid login for multiple operations)
+   - Read-only session optimization (currently opens RW for everything)
+
+8. **PIN Management**
+   - Change user PIN command
+   - Change SO PIN command
+   - PIN complexity validation
+
+9. **Certificate Management**
+   - Import X.509 certificates to token
+   - Link certificates to keypairs
+   - Certificate chain validation
+
+**Low Priority**
+10. **Multi-token Operations**
+    - Copy keys between tokens
+    - Compare token contents
+    - Synchronize key sets
+
+11. **Audit Logging**
+    - Structured JSON logs for operations
+    - Audit trail for key usage
+    - Compliance reporting
+
+12. **Performance Benchmarking**
+    - Measure sign/verify throughput
+    - Measure encrypt/decrypt latency
+    - Compare mechanisms (RSA vs ECDSA)
+
+### Contributing Notes
+
+When implementing new features:
+- **Start with mechanism support**: Check if `cryptoki` supports the mechanism first
+- **Update `mechanism_name()`**: Add new mechanisms to [utils.rs](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs#L10-L21)
+- **Follow logging pattern**: Always log C_ function names before PKCS#11 calls
+- **Add to test suite**: Update [test.sh](../test.sh) with test cases
+- **Document in README**: Add usage examples to main README
+- **Reference standards**: Link to RFCs/NIST specs in code comments
+
+### Cryptoki Version Migration
+
+**Recent upgrade: v0.6 → v0.10 (Dec 2025)**
+- `GcmParams::new()` now returns `Result<GcmParams, Error>` - use `?` operator
+- IV parameter changed from `&[u8]` to `&mut [u8]` - use `let mut iv` and `&mut iv`
+- `Ulong` still uses `u64` (not `u32`) - cast with `as u64`
+- All 24 tests pass after migration
+
+When upgrading to future versions:
+1. Check [cryptoki changelog](https://github.com/parallaxsecond/rust-cryptoki/releases) for breaking changes
+2. Update `mechanism_name()` helper with new mechanisms in [utils.rs](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs)
+3. Test all existing operations with full Docker rebuild: `docker compose build --no-cache`
+4. Run integration tests: `docker exec rust-hsm-app /app/test.sh`
+5. Update this file with newly supported mechanisms and API changes

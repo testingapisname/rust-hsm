@@ -1,5 +1,4 @@
 use cryptoki::context::{CInitializeArgs, Pkcs11};
-use cryptoki::slot::Slot;
 use cryptoki::types::AuthPin;
 use tracing::{info, debug, trace};
 

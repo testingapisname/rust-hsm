@@ -18,10 +18,24 @@ echo "Test token: $TEST_TOKEN"
 
 # Cleanup function
 cleanup() {
-    echo "Cleaning up..."
-    rm -f /app/test-*.txt /app/test-*.sig
-    # Try to remove test token files (best effort)
-    rm -f /tokens/${TEST_TOKEN}.* 2>/dev/null || true
+    set +e  # Disable exit on error for cleanup
+    echo ""
+    echo "Cleaning up test artifacts..."
+    
+    # Remove test files
+    rm -f /app/test-*.txt /app/test-*.sig /app/test-*.enc /app/test-*.bin /app/test-*.pem /app/test.csr /app/test-wrapped.bin 2>/dev/null
+    
+    # Delete ALL test tokens matching TEST_TOKEN_* pattern from SoftHSM
+    TOKENS_DELETED=0
+    for token in $(softhsm2-util --show-slots 2>/dev/null | grep "Label:" | grep "TEST_TOKEN_" | sed 's/.*Label: *//'); do
+        if softhsm2-util --delete-token --token "$token" 2>&1 | grep -q "deleted"; then
+            echo "✓ Removed test token: $token"
+            ((TOKENS_DELETED++))
+        fi
+    done
+    if [ $TOKENS_DELETED -gt 0 ]; then
+        echo "✓ Cleaned up $TOKENS_DELETED test token(s) from SoftHSM"
+    fi
 }
 
 trap cleanup EXIT

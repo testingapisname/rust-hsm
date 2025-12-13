@@ -127,11 +127,11 @@ pub fn encrypt_symmetric(
     info!("Read {} bytes from {}", plaintext.len(), input_path);
 
     // Generate random 96-bit (12-byte) IV for AES-GCM
-    let iv: Vec<u8> = (0..12).map(|_| rand::random::<u8>()).collect();
+    let mut iv: Vec<u8> = (0..12).map(|_| rand::random::<u8>()).collect();
     trace!("Generated IV: {} bytes", iv.len());
 
     // Encrypt using AES-GCM
-    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&iv, &[], 128u64.into()));
+    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], 128u64.into())?);
     debug!("Using encryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_EncryptInit, C_Encrypt");
     let ciphertext = session.encrypt(&mechanism, key, &plaintext)?;
@@ -215,12 +215,12 @@ pub fn decrypt_symmetric(
     }
 
     // Extract IV (first 12 bytes) and ciphertext (remaining bytes)
-    let iv = &data[..12];
+    let mut iv = data[..12].to_vec();
     let ciphertext = &data[12..];
     trace!("Extracted IV: {} bytes, ciphertext: {} bytes", iv.len(), ciphertext.len());
 
     // Decrypt using AES-GCM
-    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(iv, &[], 128u64.into()));
+    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], 128u64.into())?);
     debug!("Using decryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_DecryptInit, C_Decrypt");
     let plaintext = session.decrypt(&mechanism, key, ciphertext)?;
