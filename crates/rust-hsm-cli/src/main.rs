@@ -133,6 +133,53 @@ enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
+    
+    /// Delete a keypair from the token
+    DeleteKey {
+        #[arg(long)]
+        label: String,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
+    /// Encrypt data with an RSA public key
+    Encrypt {
+        #[arg(long)]
+        label: String,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        #[arg(long)]
+        input: String,
+        #[arg(long)]
+        output: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
+    /// Decrypt data with an RSA private key
+    Decrypt {
+        #[arg(long)]
+        label: String,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        #[arg(long)]
+        input: String,
+        #[arg(long)]
+        output: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -221,6 +268,30 @@ fn main() -> anyhow::Result<()> {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
             pkcs11::keys::export_pubkey(&module_path, &label, &user_pin_value, &key_label, &output)?;
+        }
+        Commands::DeleteKey { label, user_pin, key_label, pin_stdin } => {
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::keys::delete_key(&module_path, &label, &user_pin_value, &key_label)?;
+        }
+        Commands::Encrypt { label, user_pin, key_label, input, output, pin_stdin } => {
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::keys::encrypt(&module_path, &label, &user_pin_value, &key_label, &input, &output)?;
+        }
+        Commands::Decrypt { label, user_pin, key_label, input, output, pin_stdin } => {
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::keys::decrypt(&module_path, &label, &user_pin_value, &key_label, &input, &output)?;
         }
     }
 

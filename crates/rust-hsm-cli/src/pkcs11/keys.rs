@@ -663,3 +663,223 @@ fn encode_pem(label: &str, data: &[u8]) -> String {
     pem.push_str(&format!("-----END {}-----\n", label));
     pem
 }
+
+pub fn delete_key(
+    module_path: &str,
+    label: &str,
+    user_pin: &str,
+    key_label: &str,
+) -> anyhow::Result<()> {
+    debug!("Loading PKCS#11 module from: {}", module_path);
+    let pkcs11 = Pkcs11::new(module_path)?;
+    debug!("PKCS#11 module loaded successfully");
+    
+    debug!("→ Calling C_Initialize");
+    pkcs11.initialize(CInitializeArgs::OsThreads)?;
+    debug!("PKCS#11 library initialized");
+
+    debug!("Finding token slot for label: {}", label);
+    let slot = find_token_slot(&pkcs11, label)?;
+    info!("Deleting key '{}' from token '{}' in slot {}", key_label, label, usize::from(slot));
+
+    debug!("→ Calling C_OpenSession");
+    let session = pkcs11.open_rw_session(slot)?;
+    debug!("Session opened successfully");
+    
+    let pin = AuthPin::new(user_pin.to_string());
+    debug!("→ Calling C_Login");
+    session.login(UserType::User, Some(&pin))?;
+    debug!("Logged in as User");
+
+    // Find all objects with this label (public and private key)
+    debug!("→ Calling C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal");
+    let template = vec![
+        Attribute::Label(key_label.as_bytes().to_vec()),
+    ];
+    let objects = session.find_objects(&template)?;
+    
+    if objects.is_empty() {
+        debug!("→ Calling C_Logout, C_Finalize");
+        session.logout()?;
+        pkcs11.finalize();
+        anyhow::bail!("Key '{}' not found", key_label);
+    }
+
+    debug!("Found {} object(s) to delete", objects.len());
+    
+    // Delete each object (typically public and private key)
+    for (i, obj) in objects.iter().enumerate() {
+        debug!("→ Calling C_DestroyObject for object {}/{}", i + 1, objects.len());
+        session.destroy_object(*obj)?;
+        debug!("Destroyed object with handle: {:?}", obj);
+    }
+
+    println!("Key '{}' deleted successfully ({} object(s) removed)", key_label, objects.len());
+
+    debug!("→ Calling C_Logout");
+    session.logout()?;
+    debug!("Logged out");
+    
+    debug!("→ Calling C_Finalize");
+    pkcs11.finalize();
+    debug!("PKCS#11 library finalized");
+
+    Ok(())
+}
+
+pub fn encrypt(
+    module_path: &str,
+    label: &str,
+    user_pin: &str,
+    key_label: &str,
+    input_path: &str,
+    output_path: &str,
+) -> anyhow::Result<()> {
+    debug!("Loading PKCS#11 module from: {}", module_path);
+    let pkcs11 = Pkcs11::new(module_path)?;
+    debug!("PKCS#11 module loaded successfully");
+    
+    debug!("→ Calling C_Initialize");
+    pkcs11.initialize(CInitializeArgs::OsThreads)?;
+    debug!("PKCS#11 library initialized");
+
+    debug!("Finding token slot for label: {}", label);
+    let slot = find_token_slot(&pkcs11, label)?;
+    info!("Encrypting data with key '{}' on token '{}'", key_label, label);
+
+    debug!("→ Calling C_OpenSession");
+    let session = pkcs11.open_ro_session(slot)?;
+    debug!("Session opened successfully");
+    
+    let pin = AuthPin::new(user_pin.to_string());
+    debug!("→ Calling C_Login");
+    session.login(UserType::User, Some(&pin))?;
+    debug!("Logged in as User");
+
+    // Find the public key
+    debug!("→ Calling C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal");
+    let template = vec![
+        Attribute::Label(key_label.as_bytes().to_vec()),
+        Attribute::Class(cryptoki::object::ObjectClass::PUBLIC_KEY),
+    ];
+    let objects = session.find_objects(&template)?;
+    
+    if objects.is_empty() {
+        debug!("→ Calling C_Logout, C_Finalize");
+        session.logout()?;
+        pkcs11.finalize();
+        anyhow::bail!("Public key '{}' not found", key_label);
+    }
+
+    let public_key = objects[0];
+    debug!("Found public key object with handle: {:?}", public_key);
+
+    // Read input data
+    let plaintext = fs::read(input_path)?;
+    info!("Read {} bytes from {}", plaintext.len(), input_path);
+    
+    // RSA can only encrypt data up to key_size - padding_overhead
+    // For PKCS#1 v1.5, overhead is 11 bytes
+    // So max plaintext for 2048-bit key is 245 bytes, for 4096-bit is 501 bytes
+    if plaintext.len() > 245 {
+        anyhow::bail!("Input data too large for RSA encryption (max 245 bytes for 2048-bit key, {} bytes provided)", plaintext.len());
+    }
+
+    // Encrypt using RSA PKCS#1 v1.5
+    debug!("→ Calling C_EncryptInit, C_Encrypt");
+    let mechanism = Mechanism::RsaPkcs;
+    let ciphertext = session.encrypt(&mechanism, public_key, &plaintext)?;
+    
+    info!("Encrypted {} bytes to {} bytes", plaintext.len(), ciphertext.len());
+
+    // Write ciphertext to file
+    fs::write(output_path, &ciphertext)?;
+    println!("Data encrypted successfully");
+    println!("  Input: {} ({} bytes)", input_path, plaintext.len());
+    println!("  Output: {} ({} bytes)", output_path, ciphertext.len());
+
+    debug!("→ Calling C_Logout");
+    session.logout()?;
+    debug!("Logged out");
+    
+    debug!("→ Calling C_Finalize");
+    pkcs11.finalize();
+    debug!("PKCS#11 library finalized");
+
+    Ok(())
+}
+
+pub fn decrypt(
+    module_path: &str,
+    label: &str,
+    user_pin: &str,
+    key_label: &str,
+    input_path: &str,
+    output_path: &str,
+) -> anyhow::Result<()> {
+    debug!("Loading PKCS#11 module from: {}", module_path);
+    let pkcs11 = Pkcs11::new(module_path)?;
+    debug!("PKCS#11 module loaded successfully");
+    
+    debug!("→ Calling C_Initialize");
+    pkcs11.initialize(CInitializeArgs::OsThreads)?;
+    debug!("PKCS#11 library initialized");
+
+    debug!("Finding token slot for label: {}", label);
+    let slot = find_token_slot(&pkcs11, label)?;
+    info!("Decrypting data with key '{}' on token '{}'", key_label, label);
+
+    debug!("→ Calling C_OpenSession");
+    let session = pkcs11.open_ro_session(slot)?;
+    debug!("Session opened successfully");
+    
+    let pin = AuthPin::new(user_pin.to_string());
+    debug!("→ Calling C_Login");
+    session.login(UserType::User, Some(&pin))?;
+    debug!("Logged in as User");
+
+    // Find the private key
+    debug!("→ Calling C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal");
+    let template = vec![
+        Attribute::Label(key_label.as_bytes().to_vec()),
+        Attribute::Class(cryptoki::object::ObjectClass::PRIVATE_KEY),
+    ];
+    let objects = session.find_objects(&template)?;
+    
+    if objects.is_empty() {
+        debug!("→ Calling C_Logout, C_Finalize");
+        session.logout()?;
+        pkcs11.finalize();
+        anyhow::bail!("Private key '{}' not found", key_label);
+    }
+
+    let private_key = objects[0];
+    debug!("Found private key object with handle: {:?}", private_key);
+
+    // Read ciphertext
+    let ciphertext = fs::read(input_path)?;
+    info!("Read {} bytes from {}", ciphertext.len(), input_path);
+
+    // Decrypt using RSA PKCS#1 v1.5
+    debug!("→ Calling C_DecryptInit, C_Decrypt");
+    let mechanism = Mechanism::RsaPkcs;
+    let plaintext = session.decrypt(&mechanism, private_key, &ciphertext)?;
+    
+    info!("Decrypted {} bytes to {} bytes", ciphertext.len(), plaintext.len());
+
+    // Write plaintext to file
+    fs::write(output_path, &plaintext)?;
+    println!("Data decrypted successfully");
+    println!("  Input: {} ({} bytes)", input_path, ciphertext.len());
+    println!("  Output: {} ({} bytes)", output_path, plaintext.len());
+
+    debug!("→ Calling C_Logout");
+    session.logout()?;
+    debug!("Logged out");
+    
+    debug!("→ Calling C_Finalize");
+    pkcs11.finalize();
+    debug!("PKCS#11 library finalized");
+
+    Ok(())
+}

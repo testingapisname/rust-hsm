@@ -106,10 +106,48 @@ echo -e "\n${GREEN}[14/15] Testing RSA public key export${NC}"
 $CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --output /app/test-rsa-export.pem && echo "✓ RSA public key exported" || exit 1
 openssl rsa -pubin -in /app/test-rsa-export.pem -text -noout > /dev/null 2>&1 && echo "✓ RSA PEM format valid" || exit 1
 
-echo -e "\n${GREEN}[15/15] Testing ECDSA public key export${NC}"
+echo -e "\n${GREEN}[15/18] Testing ECDSA public key export${NC}"
 $CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p256" --output /app/test-p256-export.pem && echo "✓ P-256 public key exported" || exit 1
 openssl ec -pubin -in /app/test-p256-export.pem -text -noout > /dev/null 2>&1 && echo "✓ P-256 PEM format valid" || exit 1
 $CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p384" --output /app/test-p384-export.pem && echo "✓ P-384 public key exported" || exit 1
 openssl ec -pubin -in /app/test-p384-export.pem -text -noout > /dev/null 2>&1 && echo "✓ P-384 PEM format valid" || exit 1
+
+echo -e "\n${GREEN}[16/18] Testing RSA encryption/decryption${NC}"
+if [ -n "$DOCKER_CONTAINER" ]; then
+    docker exec $DOCKER_CONTAINER bash -c "echo 'Secret test message' > /app/test-encrypt.txt"
+else
+    echo 'Secret test message' > /app/test-encrypt.txt
+fi
+$CLI encrypt --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --input /app/test-encrypt.txt --output /app/test-encrypt.bin && echo "✓ Data encrypted" || exit 1
+$CLI decrypt --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --input /app/test-encrypt.bin --output /app/test-decrypt.txt && echo "✓ Data decrypted" || exit 1
+if [ -n "$DOCKER_CONTAINER" ]; then
+    DECRYPTED=$(docker exec $DOCKER_CONTAINER cat /app/test-decrypt.txt)
+else
+    DECRYPTED=$(cat /app/test-decrypt.txt)
+fi
+if [ "$DECRYPTED" = "Secret test message" ]; then
+    echo "✓ Decrypted content matches original"
+else
+    echo -e "${RED}✗ Decrypted content doesn't match${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[17/18] Testing key deletion${NC}"
+$CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "delete-me" --key-type rsa --bits 2048 && echo "✓ Temporary key created" || exit 1
+$CLI delete-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "delete-me" && echo "✓ Key deleted successfully" || exit 1
+if $CLI list-objects --label "$TEST_TOKEN" --user-pin "$USER_PIN" 2>&1 | grep -q "delete-me"; then
+    echo -e "${RED}✗ Key still exists after deletion${NC}"
+    exit 1
+else
+    echo "✓ Key no longer exists"
+fi
+
+echo -e "\n${GREEN}[18/18] Testing delete of non-existent key (should fail)${NC}"
+if $CLI delete-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "nonexistent" 2>&1 | grep -q "not found"; then
+    echo "✓ Correctly reported non-existent key"
+else
+    echo -e "${RED}✗ Should have failed to delete non-existent key${NC}"
+    exit 1
+fi
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
