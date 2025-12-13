@@ -7,10 +7,12 @@ pub fn init_token(module_path: &str, label: &str, so_pin: &str) -> anyhow::Resul
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("Initializing PKCS#11 library");
+    debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
 
     // Find an uninitialized slot
     debug!("Retrieving all available slots");
+    debug!("→ Calling C_GetSlotList");
     let all_slots = pkcs11.get_all_slots()?;
     debug!("Found {} total slots", all_slots.len());
     trace!("All slots: {:?}", all_slots);
@@ -32,12 +34,14 @@ pub fn init_token(module_path: &str, label: &str, so_pin: &str) -> anyhow::Resul
     // Initialize token with SO PIN
     let so_pin = AuthPin::new(so_pin.to_string());
     debug!("Calling PKCS#11 init_token with label: {}", label);
+    debug!("→ Calling C_InitToken");
     pkcs11.init_token(slot, &so_pin, label)?;
     debug!("Token initialized successfully");
     
     println!("Token '{}' initialized successfully in slot {}", label, usize::from(slot));
 
     debug!("Finalizing PKCS#11 library");
+    debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     
     Ok(())
@@ -58,25 +62,30 @@ pub fn init_pin(module_path: &str, label: &str, so_pin: &str, user_pin: &str) ->
 
     // Open RW session and login as SO
     debug!("Opening read-write session on slot {}", usize::from(slot));
+    debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_rw_session(slot)?;
     debug!("Session opened successfully");
     
     let so_pin = AuthPin::new(so_pin.to_string());
     debug!("Logging in as Security Officer (SO)");
+    debug!("→ Calling C_Login");
     session.login(cryptoki::session::UserType::So, Some(&so_pin))?;
     debug!("SO login successful");
     
     // Initialize user PIN
     let user_pin = AuthPin::new(user_pin.to_string());
     debug!("Calling PKCS#11 init_pin to set user PIN");
+    debug!("→ Calling C_InitPIN");
     session.init_pin(&user_pin)?;
     debug!("User PIN initialized successfully");
     
     println!("User PIN initialized successfully for token '{}'", label);
     
     debug!("Logging out from session");
+    debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Finalizing PKCS#11 library");
+    debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     
     Ok(())

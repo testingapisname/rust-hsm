@@ -6,9 +6,11 @@ pub fn list_slots(module_path: &str) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("Initializing PKCS#11 library");
+    debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
 
     debug!("Retrieving slots with initialized tokens");
+    debug!("→ Calling C_GetSlotList (with tokens)");
     let slots = pkcs11.get_slots_with_initialized_token()?;
     debug!("Found {} initialized slots", slots.len());
     trace!("Initialized slots: {:?}", slots);
@@ -23,6 +25,7 @@ pub fn list_slots(module_path: &str) -> anyhow::Result<()> {
     }
 
     debug!("Retrieving all available slots");
+    debug!("→ Calling C_GetSlotList (all)");
     let all_slots = pkcs11.get_all_slots()?;
     debug!("Found {} total slots", all_slots.len());
     trace!("All slots: {:?}", all_slots);
@@ -33,6 +36,7 @@ pub fn list_slots(module_path: &str) -> anyhow::Result<()> {
     }
 
     debug!("Finalizing PKCS#11 library");
+    debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     
     Ok(())
@@ -40,6 +44,7 @@ pub fn list_slots(module_path: &str) -> anyhow::Result<()> {
 
 fn print_slot_info(pkcs11: &Pkcs11, slot: Slot) -> anyhow::Result<()> {
     debug!("Retrieving info for slot {}", usize::from(slot));
+    debug!("→ Calling C_GetSlotInfo");
     let slot_info = pkcs11.get_slot_info(slot)?;
     trace!("Slot info: {:?}", slot_info);
     
@@ -49,6 +54,7 @@ fn print_slot_info(pkcs11: &Pkcs11, slot: Slot) -> anyhow::Result<()> {
     
     // Check if token is present by trying to get token info
     debug!("Retrieving token info for slot {}", usize::from(slot));
+    debug!("→ Calling C_GetTokenInfo");
     match pkcs11.get_token_info(slot) {
         Ok(token_info) => {
             trace!("Token info: {:?}", token_info);

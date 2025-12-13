@@ -5,9 +5,11 @@ pub fn display_info(module_path: &str) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("Initializing PKCS#11 library");
+    debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
 
     debug!("Retrieving library information");
+    debug!("→ Calling C_GetInfo");
     let info = pkcs11.get_library_info()?;
     trace!("Library info: {:?}", info);
     
@@ -17,6 +19,7 @@ pub fn display_info(module_path: &str) -> anyhow::Result<()> {
     println!("Manufacturer ID: {}", info.manufacturer_id());
     
     debug!("Finalizing PKCS#11 library");
+    debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     
     Ok(())

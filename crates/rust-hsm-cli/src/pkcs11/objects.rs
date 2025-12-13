@@ -9,6 +9,7 @@ pub fn list_objects(module_path: &str, label: &str, user_pin: &str) -> anyhow::R
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("Initializing PKCS#11 library");
+    debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
 
     // Find slot with matching token label
@@ -18,12 +19,14 @@ pub fn list_objects(module_path: &str, label: &str, user_pin: &str) -> anyhow::R
     
     info!("Opening session on slot {}", usize::from(slot));
     debug!("Opening read-only session");
+    debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_ro_session(slot)?;
     debug!("Session opened successfully");
     
     // Login as user
     let pin = AuthPin::new(user_pin.to_string());
     debug!("Logging in as User");
+    debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
     debug!("User login successful");
     
@@ -31,6 +34,7 @@ pub fn list_objects(module_path: &str, label: &str, user_pin: &str) -> anyhow::R
     
     // Find all objects
     debug!("Searching for all objects (empty template)");
+    debug!("→ Calling C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal");
     let objects = session.find_objects(&[])?;
     debug!("Found {} objects", objects.len());
     trace!("Object handles: {:?}", objects);
@@ -43,6 +47,7 @@ pub fn list_objects(module_path: &str, label: &str, user_pin: &str) -> anyhow::R
             println!("\nObject {}:", idx + 1);
             
             // Try to get common attributes
+            debug!("→ Calling C_GetAttributeValue");
             if let Ok(attrs) = session.get_attributes(*obj, &[
                 AttributeType::Label,
                 AttributeType::Class,
@@ -72,8 +77,10 @@ pub fn list_objects(module_path: &str, label: &str, user_pin: &str) -> anyhow::R
     }
     
     debug!("Logging out from session");
+    debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Finalizing PKCS#11 library");
+    debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     
     Ok(())

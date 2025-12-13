@@ -20,6 +20,7 @@ pub fn gen_keypair(
     debug!("PKCS#11 module loaded successfully");
     
     debug!("Initializing PKCS#11 library with OS threads");
+    debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
     debug!("PKCS#11 library initialized");
 
@@ -140,6 +141,7 @@ pub fn sign(
     debug!("Loading PKCS#11 module for signing operation");
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("Initializing PKCS#11 library");
+    debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
 
     debug!("Finding token slot for label: {}", label);
@@ -156,6 +158,7 @@ pub fn sign(
 
     // Find private key by label
     debug!("Searching for private key with label: {}", key_label);
+    debug!("→ Calling C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal");
     let key_handle = find_key_by_label(&session, key_label, true)?;
     debug!("Private key found with handle: {:?}", key_handle);
 
@@ -211,6 +214,7 @@ pub fn verify(
     debug!("Loading PKCS#11 module for verification operation");
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("Initializing PKCS#11 library");
+    debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
 
     debug!("Finding token slot for label: {}", label);
@@ -227,6 +231,7 @@ pub fn verify(
 
     // Find public key by label
     debug!("Searching for public key with label: {}", key_label);
+    debug!("→ Calling C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal");
     let key_handle = find_key_by_label(&session, key_label, false)?;
     debug!("Public key found with handle: {:?}", key_handle);
 
@@ -241,6 +246,7 @@ pub fn verify(
 
     // Determine key type and select appropriate mechanism
     debug!("Querying key type from key handle");
+    debug!("→ Calling C_GetAttributeValue");
     let key_type = get_key_type(&session, key_handle)?;
     debug!("Key type detected: {}", key_type);
     let mechanism = match key_type.as_str() {
@@ -259,10 +265,14 @@ pub fn verify(
         debug!("SHA-256 hash computed: {} bytes", hash.len());
         trace!("Hash value: {:02x?}", &hash[..]);
         debug!("Calling PKCS#11 verify operation on hash");
+        debug!("→ Calling C_VerifyInit");
+        debug!("→ Calling C_Verify");
         session.verify(&mechanism, key_handle, &hash, &signature)
     } else {
         debug!("RSA detected: verifying data directly (mechanism includes hashing)");
         debug!("Calling PKCS#11 verify operation on raw data");
+        debug!("→ Calling C_VerifyInit");
+        debug!("→ Calling C_Verify");
         session.verify(&mechanism, key_handle, &data, &signature)
     };
 
@@ -331,6 +341,7 @@ fn get_key_type(
     use cryptoki::object::KeyType;
     
     debug!("Querying KeyType attribute from handle: {:?}", key_handle);
+    debug!("→ Calling C_GetAttributeValue");
     let attrs = session.get_attributes(key_handle, &[AttributeType::KeyType])?;
     trace!("Received attributes: {:?}", attrs);
     
