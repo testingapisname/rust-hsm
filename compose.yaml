@@ -1,0 +1,21 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: rust-hsm:latest
+    container_name: rust-hsm-app
+    volumes:
+      - tokens:/tokens
+    environment:
+      - SOFTHSM2_CONF=/etc/softhsm2.conf
+      - PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so
+      - TOKEN_LABEL=${TOKEN_LABEL:-DEV_TOKEN}
+      - USER_PIN=${USER_PIN:-123456}
+      - SO_PIN=${SO_PIN:-1234}
+    stdin_open: true
+    tty: true
+
+volumes:
+  tokens:
+    name: rust-hsm_tokens
