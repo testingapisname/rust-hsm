@@ -322,9 +322,34 @@ else
     echo "✓ CMAC verification correctly rejected tampered data"
 fi
 
-echo -e "\n${GREEN}[34/34] Testing key attribute inspection${NC}"
+echo -e "\n${GREEN}[34/36] Testing key attribute inspection${NC}"
 $CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-key 2>/dev/null | grep -q "CKA_CLASS" && echo "✓ Inspect-key displays attributes" || exit 1
 $CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-cmac-key 2>/dev/null | grep -q "CKA_VALUE_LEN" && echo "✓ AES key attributes displayed" || exit 1
+
+echo -e "\n${GREEN}[35/36] Testing random number generation (hex output)${NC}"
+RANDOM_HEX=$($CLI gen-random --bytes 32 2>/dev/null | tail -1)
+if [ ${#RANDOM_HEX} -eq 64 ]; then
+    echo "✓ Generated 32 random bytes (64 hex chars)"
+else
+    echo -e "${RED}✗ Random hex output incorrect length: ${#RANDOM_HEX}${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[36/36] Testing random number generation (file output)${NC}"
+$CLI gen-random --bytes 16 --output /app/test-random.bin && echo "✓ Random bytes written to file" || exit 1
+if [ -f /app/test-random.bin ] && [ $(wc -c < /app/test-random.bin) -eq 16 ]; then
+    echo "✓ Random file size correct (16 bytes)"
+else
+    echo -e "${RED}✗ Random file size incorrect${NC}"
+    exit 1
+fi
+$CLI gen-random --bytes 16 --output /app/test-random.hex --hex && echo "✓ Random hex file created" || exit 1
+if [ -f /app/test-random.hex ] && [ $(wc -c < /app/test-random.hex) -eq 32 ]; then
+    echo "✓ Random hex file size correct (32 chars)"
+else
+    echo -e "${RED}✗ Random hex file size incorrect${NC}"
+    exit 1
+fi
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
 

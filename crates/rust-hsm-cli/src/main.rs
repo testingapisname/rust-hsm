@@ -489,6 +489,19 @@ enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
+
+    /// Generate random bytes using HSM's RNG
+    GenRandom {
+        /// Number of bytes to generate
+        #[arg(long, default_value = "32")]
+        bytes: usize,
+        /// Output file (if not specified, outputs hex to stdout)
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Output as hex string instead of binary (only applies to file output)
+        #[arg(long)]
+        hex: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -780,6 +793,9 @@ fn main() -> anyhow::Result<()> {
             let input_path = PathBuf::from(&input);
             let cmac_path = PathBuf::from(&cmac);
             pkcs11::keys::cmac_verify(&module_path, &token_label, &user_pin_value, &key_label, &input_path, &cmac_path)?;
+        }
+        Commands::GenRandom { bytes, output, hex } => {
+            pkcs11::random::generate_random(&module_path, bytes, output.as_ref(), hex)?;
         }
     }
 

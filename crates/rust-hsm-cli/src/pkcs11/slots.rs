@@ -71,3 +71,13 @@ fn print_slot_info(pkcs11: &Pkcs11, slot: Slot) -> anyhow::Result<()> {
     
     Ok(())
 }
+
+/// Find the first available slot (for operations that don't require a specific token)
+pub fn find_first_slot(pkcs11: &Pkcs11) -> anyhow::Result<Slot> {
+    debug!("Finding first available slot");
+    let slots = pkcs11.get_all_slots()?;
+    
+    slots.first()
+        .copied()
+        .ok_or_else(|| anyhow::anyhow!("No slots available"))
+}
