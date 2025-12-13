@@ -327,6 +327,19 @@ enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
+    
+    /// Hash data using SHA-256, SHA-512, or other hash algorithms
+    Hash {
+        /// Hash algorithm (sha256, sha512, sha224, sha1)
+        #[arg(long, default_value = "sha256")]
+        algorithm: String,
+        /// Input file to hash
+        #[arg(long)]
+        input: String,
+        /// Output file for the hash
+        #[arg(long)]
+        output: String,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -525,6 +538,11 @@ fn main() -> anyhow::Result<()> {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
             pkcs11::keys::generate_csr(&module_path, &token_label, &user_pin_value, &key_label, &subject, &output)?;
+        }
+        Commands::Hash { algorithm, input, output } => {
+            let input_path = PathBuf::from(&input);
+            let output_path = PathBuf::from(&output);
+            pkcs11::keys::hash_data(&module_path, &algorithm, &input_path, &output_path)?;
         }
     }
 

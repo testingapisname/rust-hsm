@@ -238,5 +238,48 @@ else
     exit 1
 fi
 
+echo -e "\n${GREEN}[26/27] Testing SHA-256 hash${NC}"
+if [ -n "$DOCKER_CONTAINER" ]; then
+    docker exec $DOCKER_CONTAINER bash -c "echo 'Test data for hashing' > /app/test-hash-data.txt"
+else
+    echo 'Test data for hashing' > /app/test-hash-data.txt
+fi
+$CLI hash --algorithm sha256 --input /app/test-hash-data.txt --output /app/test-hash.sha256 && echo "✓ SHA-256 hash generated" || exit 1
+# Verify hash file exists and has correct size (32 bytes for SHA-256)
+if [ -f /app/test-hash.sha256 ] && [ $(wc -c < /app/test-hash.sha256) -eq 32 ]; then
+    echo "✓ SHA-256 hash size correct (32 bytes)"
+else
+    echo -e "${RED}✗ SHA-256 hash size incorrect${NC}"
+    exit 1
+fi
+# Verify hash matches system sha256sum
+SYSTEM_HASH=$(sha256sum /app/test-hash-data.txt | awk '{print $1}')
+HSM_HASH=$(od -An -tx1 /app/test-hash.sha256 | tr -d ' \n')
+if [ "$SYSTEM_HASH" = "$HSM_HASH" ]; then
+    echo "✓ SHA-256 hash matches system sha256sum"
+else
+    echo -e "${RED}✗ SHA-256 hash doesn't match system sha256sum${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[27/27] Testing SHA-512 hash${NC}"
+$CLI hash --algorithm sha512 --input /app/test-hash-data.txt --output /app/test-hash.sha512 && echo "✓ SHA-512 hash generated" || exit 1
+# Verify hash file exists and has correct size (64 bytes for SHA-512)
+if [ -f /app/test-hash.sha512 ] && [ $(wc -c < /app/test-hash.sha512) -eq 64 ]; then
+    echo "✓ SHA-512 hash size correct (64 bytes)"
+else
+    echo -e "${RED}✗ SHA-512 hash size incorrect${NC}"
+    exit 1
+fi
+# Verify hash matches system sha512sum
+SYSTEM_HASH=$(sha512sum /app/test-hash-data.txt | awk '{print $1}')
+HSM_HASH=$(od -An -tx1 /app/test-hash.sha512 | tr -d ' \n')
+if [ "$SYSTEM_HASH" = "$HSM_HASH" ]; then
+    echo "✓ SHA-512 hash matches system sha512sum"
+else
+    echo -e "${RED}✗ SHA-512 hash doesn't match system sha512sum${NC}"
+    exit 1
+fi
+
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
 
