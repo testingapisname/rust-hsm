@@ -142,12 +142,45 @@ else
     echo "✓ Key no longer exists"
 fi
 
-echo -e "\n${GREEN}[18/18] Testing delete of non-existent key (should fail)${NC}"
+echo -e "\n${GREEN}[18/21] Testing delete of non-existent key (should fail)${NC}"
 if $CLI delete-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "nonexistent" 2>&1 | grep -q "not found"; then
     echo "✓ Correctly reported non-existent key"
 else
     echo -e "${RED}✗ Should have failed to delete non-existent key${NC}"
     exit 1
 fi
+
+echo -e "\n${GREEN}[19/21] Testing AES symmetric key generation${NC}"
+$CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-test" --bits 256 && echo "✓ AES-256 key generated" || exit 1
+if $CLI list-objects --label "$TEST_TOKEN" --user-pin "$USER_PIN" 2>&1 | grep -q "aes-test"; then
+    echo "✓ AES key visible in objects"
+else
+    echo -e "${RED}✗ AES key not found in objects${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[20/21] Testing AES-GCM encryption/decryption${NC}"
+if [ -n "$DOCKER_CONTAINER" ]; then
+    docker exec $DOCKER_CONTAINER bash -c "echo 'AES test message with more data than RSA can handle!' > /app/test-aes.txt"
+else
+    echo 'AES test message with more data than RSA can handle!' > /app/test-aes.txt
+fi
+$CLI encrypt-symmetric --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-test" --input /app/test-aes.txt --output /app/test-aes.enc && echo "✓ AES data encrypted" || exit 1
+$CLI decrypt-symmetric --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-test" --input /app/test-aes.enc --output /app/test-aes-dec.txt && echo "✓ AES data decrypted" || exit 1
+if [ -n "$DOCKER_CONTAINER" ]; then
+    DECRYPTED_AES=$(docker exec $DOCKER_CONTAINER cat /app/test-aes-dec.txt)
+else
+    DECRYPTED_AES=$(cat /app/test-aes-dec.txt)
+fi
+if [ "$DECRYPTED_AES" = "AES test message with more data than RSA can handle!" ]; then
+    echo "✓ AES decrypted content matches original"
+else
+    echo -e "${RED}✗ AES decrypted content doesn't match${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[21/21] Testing AES key sizes${NC}"
+$CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-128" --bits 128 && echo "✓ AES-128 key generated" || exit 1
+$CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-192" --bits 192 && echo "✓ AES-192 key generated" || exit 1
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
