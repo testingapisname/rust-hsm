@@ -510,6 +510,9 @@ enum Commands {
         label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
+        /// Specific key label to benchmark (optional - runs full suite if omitted)
+        #[arg(long)]
+        key_label: Option<String>,
         /// Number of iterations per test
         #[arg(long, default_value = "100")]
         iterations: usize,
@@ -812,7 +815,7 @@ fn main() -> anyhow::Result<()> {
         Commands::GenRandom { bytes, output, hex } => {
             pkcs11::random::generate_random(&module_path, bytes, output.as_ref(), hex)?;
         }
-        Commands::Benchmark { label, user_pin, iterations, pin_stdin } => {
+        Commands::Benchmark { label, user_pin, key_label, iterations, pin_stdin } => {
             let token_label = config.token_label(label.as_deref())
                 .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
@@ -820,7 +823,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::benchmark::run_full_benchmark(&module_path, &token_label, &user_pin_value, iterations)?;
+            pkcs11::benchmark::run_full_benchmark(&module_path, &token_label, &user_pin_value, key_label.as_deref(), iterations)?;
         }
     }
 

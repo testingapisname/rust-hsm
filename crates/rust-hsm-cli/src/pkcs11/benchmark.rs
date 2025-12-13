@@ -53,12 +53,18 @@ pub fn run_full_benchmark(
     module_path: &str,
     token_label: &str,
     user_pin: &str,
+    key_label: Option<&str>,
     iterations: usize,
 ) -> Result<()> {
     println!("\n{}", "=".repeat(80));
     println!("HSM Performance Benchmark Suite");
     println!("{}", "=".repeat(80));
     println!("Token: {}", token_label);
+    if let Some(key) = key_label {
+        println!("Key: {}", key);
+    } else {
+        println!("Mode: Full suite with temporary keys");
+    }
     println!("Iterations per test: {}", iterations);
     println!("{}\n", "=".repeat(80));
 
@@ -75,41 +81,47 @@ pub fn run_full_benchmark(
 
     let mut results = Vec::new();
 
-    // Generate test keys
-    info!("Setting up test keys for benchmarking...");
-    setup_benchmark_keys(&session)?;
+    if let Some(key_label) = key_label {
+        // Benchmark specific user key
+        info!("Benchmarking specific key: {}", key_label);
+        results.extend(benchmark_specific_key(&session, key_label, iterations)?);
+    } else {
+        // Generate test keys and run full suite
+        info!("Setting up test keys for benchmarking...");
+        setup_benchmark_keys(&session)?;
 
-    // Benchmark signing operations
-    println!("\n📝 SIGNING OPERATIONS\n");
-    results.push(bench_rsa_sign(&session, "bench-rsa-2048", 2048, iterations)?);
-    results.push(bench_rsa_sign(&session, "bench-rsa-4096", 4096, iterations)?);
-    results.push(bench_ecdsa_sign(&session, "bench-p256", "P-256", iterations)?);
-    results.push(bench_ecdsa_sign(&session, "bench-p384", "P-384", iterations)?);
+        // Benchmark signing operations
+        println!("\n📝 SIGNING OPERATIONS\n");
+        results.push(bench_rsa_sign(&session, "bench-rsa-2048", 2048, iterations)?);
+        results.push(bench_rsa_sign(&session, "bench-rsa-4096", 4096, iterations)?);
+        results.push(bench_ecdsa_sign(&session, "bench-p256", "P-256", iterations)?);
+        results.push(bench_ecdsa_sign(&session, "bench-p384", "P-384", iterations)?);
 
-    // Benchmark verification operations
-    println!("\n✅ VERIFICATION OPERATIONS\n");
-    results.push(bench_rsa_verify(&session, "bench-rsa-2048", iterations)?);
-    results.push(bench_ecdsa_verify(&session, "bench-p256", iterations)?);
+        // Benchmark verification operations
+        println!("\n✅ VERIFICATION OPERATIONS\n");
+        results.push(bench_rsa_verify(&session, "bench-rsa-2048", iterations)?);
+        results.push(bench_ecdsa_verify(&session, "bench-p256", iterations)?);
 
-    // Benchmark encryption operations
-    println!("\n🔐 ENCRYPTION OPERATIONS\n");
-    results.push(bench_rsa_encrypt(&session, "bench-rsa-2048", iterations)?);
-    results.push(bench_aes_encrypt(&session, "bench-aes-256", iterations)?);
+        // Benchmark encryption operations
+        println!("\n🔐 ENCRYPTION OPERATIONS\n");
+        results.push(bench_rsa_encrypt(&session, "bench-rsa-2048", iterations)?);
+        results.push(bench_aes_encrypt(&session, "bench-aes-256", iterations)?);
 
-    // Benchmark hash operations
-    println!("\n#️⃣ HASH OPERATIONS\n");
-    results.push(bench_hash(&session, "SHA-256", Mechanism::Sha256, iterations)?);
-    results.push(bench_hash(&session, "SHA-384", Mechanism::Sha384, iterations)?);
-    results.push(bench_hash(&session, "SHA-512", Mechanism::Sha512, iterations)?);
+        // Benchmark hash operations
+        println!("\n#️⃣ HASH OPERATIONS\n");
+        results.push(bench_hash(&session, "SHA-256", Mechanism::Sha256, iterations)?);
+        results.push(bench_hash(&session, "SHA-384", Mechanism::Sha384, iterations)?);
+        results.push(bench_hash(&session, "SHA-512", Mechanism::Sha512, iterations)?);
 
-    // Benchmark MAC operations
-    println!("\n🔏 MAC OPERATIONS\n");
-    results.push(bench_hmac(&session, "bench-hmac-key", iterations)?);
-    results.push(bench_cmac(&session, "bench-cmac-key", iterations)?);
+        // Benchmark MAC operations
+        println!("\n🔏 MAC OPERATIONS\n");
+        results.push(bench_hmac(&session, "bench-hmac-key", iterations)?);
+        results.push(bench_cmac(&session, "bench-cmac-key", iterations)?);
 
-    // Benchmark random generation
-    println!("\n🎲 RANDOM GENERATION\n");
-    results.push(bench_random(&session, iterations)?);
+        // Benchmark random generation
+        println!("\n🎲 RANDOM GENERATION\n");
+        results.push(bench_random(&session, iterations)?);
+    }
 
     // Print summary table
     print_summary_table(&results);
@@ -279,6 +291,141 @@ fn find_key(session: &cryptoki::session::Session, label: &str, class: ObjectClas
         Attribute::Label(label.as_bytes().to_vec()),
     ])?;
     objects.first().copied().ok_or_else(|| anyhow::anyhow!("Key not found: {}", label))
+}
+
+fn detect_key_type(session: &cryptoki::session::Session, label: &str) -> Result<String> {
+    use cryptoki::object::KeyType;
+    
+    // Try to find as private key first
+    if let Ok(key) = find_key(session, label, ObjectClass::PRIVATE_KEY) {
+        let attrs = session.get_attributes(key, &[
+            cryptoki::object::AttributeType::KeyType,
+            cryptoki::object::AttributeType::ModulusBits,
+        ])?;
+        
+        for attr in &attrs {
+            if let Attribute::KeyType(key_type) = attr {
+                match key_type {
+                    &KeyType::RSA => {
+                        // Get modulus bits
+                        for attr in &attrs {
+                            if let Attribute::ModulusBits(bits) = attr {
+                                return Ok(format!("RSA-{}", bits.to_string()));
+                            }
+                        }
+                        return Ok("RSA".to_string());
+                    }
+                    &KeyType::EC => {
+                        // Try to determine curve
+                        let ec_attrs = session.get_attributes(key, &[cryptoki::object::AttributeType::EcParams])?;
+                        for attr in ec_attrs {
+                            if let Attribute::EcParams(params) = attr {
+                                // P-256: [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07]
+                                // P-384: [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22]
+                                if params.len() == 10 && params[0..2] == [0x06, 0x08] {
+                                    return Ok("ECDSA-P256".to_string());
+                                } else if params.len() == 7 && params[0..2] == [0x06, 0x05] {
+                                    return Ok("ECDSA-P384".to_string());
+                                }
+                                return Ok("ECDSA".to_string());
+                            }
+                        }
+                        return Ok("ECDSA".to_string());
+                    }
+                    _ => return Ok(format!("{:?}", key_type)),
+                }
+            }
+        }
+    }
+    
+    // Try as secret key
+    if let Ok(key) = find_key(session, label, ObjectClass::SECRET_KEY) {
+        let attrs = session.get_attributes(key, &[cryptoki::object::AttributeType::KeyType])?;
+        for attr in &attrs {
+            if let Attribute::KeyType(key_type) = attr {
+                match key_type {
+                    &KeyType::AES => return Ok("AES".to_string()),
+                    &KeyType::GENERIC_SECRET => return Ok("GENERIC_SECRET".to_string()),
+                    _ => return Ok(format!("{:?}", key_type)),
+                }
+            }
+        }
+    }
+    
+    anyhow::bail!("Could not determine key type for '{}'", label)
+}
+
+fn benchmark_specific_key(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    iterations: usize,
+) -> Result<Vec<BenchmarkResult>> {
+    let key_type = detect_key_type(session, key_label)?;
+    info!("Detected key type: {}", key_type);
+    
+    let mut results = Vec::new();
+    
+    if key_type.starts_with("RSA") {
+        // Extract bit size
+        let bits: usize = if key_type.contains("-") {
+            key_type.split('-').nth(1).and_then(|s| s.parse().ok()).unwrap_or(2048)
+        } else {
+            2048
+        };
+        
+        println!("\n📝 RSA OPERATIONS\n");
+        println!("Testing RSA-{} key: {}\n", bits, key_label);
+        
+        results.push(bench_rsa_sign(session, key_label, bits, iterations)?);
+        results.push(bench_rsa_verify(session, key_label, iterations)?);
+        results.push(bench_rsa_encrypt(session, key_label, iterations)?);
+        
+    } else if key_type.starts_with("ECDSA") {
+        let curve = if key_type.contains("P256") {
+            "P-256"
+        } else if key_type.contains("P384") {
+            "P-384"
+        } else {
+            "P-256" // default
+        };
+        
+        println!("\n📝 ECDSA OPERATIONS\n");
+        println!("Testing {} key: {}\n", key_type, key_label);
+        
+        results.push(bench_ecdsa_sign(session, key_label, curve, iterations)?);
+        results.push(bench_ecdsa_verify(session, key_label, iterations)?);
+        
+    } else if key_type == "AES" || key_type == "GENERIC_SECRET" {
+        println!("\n🔐 SYMMETRIC KEY OPERATIONS\n");
+        println!("Testing {} key: {}\n", key_type, key_label);
+        
+        if key_type == "AES" {
+            // Check if it's CMAC-capable (CKA_SIGN attribute)
+            if let Ok(key) = find_key(session, key_label, ObjectClass::SECRET_KEY) {
+                let attrs = session.get_attributes(key, &[
+                    cryptoki::object::AttributeType::Sign,
+                    cryptoki::object::AttributeType::Encrypt,
+                ])?;
+                
+                let can_sign = attrs.iter().any(|a| matches!(a, Attribute::Sign(true)));
+                let can_encrypt = attrs.iter().any(|a| matches!(a, Attribute::Encrypt(true)));
+                
+                if can_encrypt {
+                    results.push(bench_aes_encrypt(session, key_label, iterations)?);
+                }
+                if can_sign {
+                    results.push(bench_cmac(session, key_label, iterations)?);
+                }
+            }
+        } else {
+            // GENERIC_SECRET - assume HMAC
+            results.push(bench_hmac(session, key_label, iterations)?);
+        }
+    } else {
+        anyhow::bail!("Unsupported key type for benchmarking: {}", key_type);
+    }
+    
+    Ok(results)
 }
 
 fn bench_rsa_sign(session: &cryptoki::session::Session, key_label: &str, bits: usize, iterations: usize) -> Result<BenchmarkResult> {
