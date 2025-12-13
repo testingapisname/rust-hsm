@@ -5,7 +5,7 @@ use cryptoki::session::UserType;
 use cryptoki::slot::Slot;
 use cryptoki::types::AuthPin;
 use std::fs;
-use tracing::info;
+use tracing::{info, debug, trace};
 
 pub fn gen_keypair(
     module_path: &str,
@@ -15,11 +15,18 @@ pub fn gen_keypair(
     key_type: &str,
     bits: u32,
 ) -> anyhow::Result<()> {
+    debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
+    debug!("PKCS#11 module loaded successfully");
+    
+    debug!("Initializing PKCS#11 library with OS threads");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
+    debug!("PKCS#11 library initialized");
 
+    debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
     info!("Generating {} keypair on token '{}' in slot {}", key_type, label, usize::from(slot));
+    debug!("Token found at slot: {}", usize::from(slot));
 
     let session = pkcs11.open_rw_session(slot)?;
     let pin = AuthPin::new(user_pin.to_string());
@@ -27,7 +34,9 @@ pub fn gen_keypair(
 
     match key_type.to_lowercase().as_str() {
         "rsa" => {
+            debug!("Using RSA key generation mechanism");
             let mechanism = Mechanism::RsaPkcsKeyPairGen;
+            debug!("Generating RSA-{} keypair", bits);
             
             let public_key_template = vec![
                 Attribute::Token(true),
@@ -60,6 +69,7 @@ pub fn gen_keypair(
             println!("  Private key handle: {:?}", private_key);
         }
         "ecdsa" | "ec" | "p256" | "p384" => {
+            debug!("Using ECDSA key generation mechanism");
             let mechanism = Mechanism::EccKeyPairGen;
             
             // EC parameters: ANSI X9.62 named curves
@@ -127,25 +137,36 @@ pub fn sign(
     input_path: &str,
     output_path: &str,
 ) -> anyhow::Result<()> {
+    debug!("Loading PKCS#11 module for signing operation");
     let pkcs11 = Pkcs11::new(module_path)?;
+    debug!("Initializing PKCS#11 library");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
 
+    debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
     info!("Signing data with key '{}' on token '{}'", key_label, label);
+    debug!("Token found at slot: {}", usize::from(slot));
 
+    debug!("Opening read-write session");
     let session = pkcs11.open_rw_session(slot)?;
     let pin = AuthPin::new(user_pin.to_string());
+    debug!("Logging in as User");
     session.login(UserType::User, Some(&pin))?;
+    debug!("User login successful");
 
     // Find private key by label
+    debug!("Searching for private key with label: {}", key_label);
     let key_handle = find_key_by_label(&session, key_label, true)?;
+    debug!("Private key found with handle: {:?}", key_handle);
 
     // Detect key type
     let key_type = get_key_type(&session, key_handle)?;
 
     // Read input data
+    debug!("Reading input data from: {}", input_path);
     let data = fs::read(input_path)?;
     info!("Read {} bytes from {}", data.len(), input_path);
+    trace!("Input data (first 32 bytes): {:02x?}", &data[..data.len().min(32)]);
 
     // Select appropriate signing mechanism
     let mechanism = match key_type.as_str() {
@@ -187,26 +208,41 @@ pub fn verify(
     input_path: &str,
     signature_path: &str,
 ) -> anyhow::Result<()> {
+    debug!("Loading PKCS#11 module for verification operation");
     let pkcs11 = Pkcs11::new(module_path)?;
+    debug!("Initializing PKCS#11 library");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
 
+    debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
     info!("Verifying signature with key '{}' on token '{}'", key_label, label);
+    debug!("Token found at slot: {}", usize::from(slot));
 
+    debug!("Opening read-write session");
     let session = pkcs11.open_rw_session(slot)?;
     let pin = AuthPin::new(user_pin.to_string());
+    debug!("Logging in as User");
     session.login(UserType::User, Some(&pin))?;
+    debug!("User login successful");
 
     // Find public key by label
+    debug!("Searching for public key with label: {}", key_label);
     let key_handle = find_key_by_label(&session, key_label, false)?;
+    debug!("Public key found with handle: {:?}", key_handle);
 
     // Read input data and signature
+    debug!("Reading input data from: {}", input_path);
     let data = fs::read(input_path)?;
+    debug!("Reading signature from: {}", signature_path);
     let signature = fs::read(signature_path)?;
     info!("Read {} bytes of data and {} bytes of signature", data.len(), signature.len());
+    trace!("Input data (first 32 bytes): {:02x?}", &data[..data.len().min(32)]);
+    trace!("Signature (first 32 bytes): {:02x?}", &signature[..signature.len().min(32)]);
 
     // Determine key type and select appropriate mechanism
+    debug!("Querying key type from key handle");
     let key_type = get_key_type(&session, key_handle)?;
+    debug!("Key type detected: {}", key_type);
     let mechanism = match key_type.as_str() {
         "RSA" => Mechanism::Sha256RsaPkcs,
         "EC" => Mechanism::Ecdsa,
@@ -215,23 +251,31 @@ pub fn verify(
 
     // For ECDSA, we need to hash the data first
     let verify_result = if key_type == "EC" {
+        debug!("ECDSA detected: computing SHA-256 hash of input data");
         use sha2::{Sha256, Digest};
         let mut hasher = Sha256::new();
         hasher.update(&data);
         let hash = hasher.finalize();
+        debug!("SHA-256 hash computed: {} bytes", hash.len());
+        trace!("Hash value: {:02x?}", &hash[..]);
+        debug!("Calling PKCS#11 verify operation on hash");
         session.verify(&mechanism, key_handle, &hash, &signature)
     } else {
+        debug!("RSA detected: verifying data directly (mechanism includes hashing)");
+        debug!("Calling PKCS#11 verify operation on raw data");
         session.verify(&mechanism, key_handle, &data, &signature)
     };
 
     match verify_result {
         Ok(_) => {
+            debug!("PKCS#11 verify operation succeeded");
             println!("✓ Signature verification successful");
             println!("  Input: {} ({} bytes)", input_path, data.len());
             println!("  Signature: {} ({} bytes)", signature_path, signature.len());
             println!("  Key type: {}", key_type);
         }
         Err(e) => {
+            debug!("PKCS#11 verify operation failed: {:?}", e);
             println!("✗ Signature verification failed: {}", e);
             anyhow::bail!("Verification failed");
         }
@@ -286,15 +330,27 @@ fn get_key_type(
 ) -> anyhow::Result<String> {
     use cryptoki::object::KeyType;
     
+    debug!("Querying KeyType attribute from handle: {:?}", key_handle);
     let attrs = session.get_attributes(key_handle, &[AttributeType::KeyType])?;
+    trace!("Received attributes: {:?}", attrs);
     
     if let Some(Attribute::KeyType(key_type)) = attrs.first() {
         match key_type {
-            &KeyType::RSA => Ok("RSA".to_string()),
-            &KeyType::EC => Ok("EC".to_string()),
-            _ => anyhow::bail!("Unsupported key type: {:?}", key_type),
+            &KeyType::RSA => {
+                debug!("Key type is RSA");
+                Ok("RSA".to_string())
+            }
+            &KeyType::EC => {
+                debug!("Key type is EC (Elliptic Curve)");
+                Ok("EC".to_string())
+            }
+            _ => {
+                debug!("Unsupported key type: {:?}", key_type);
+                anyhow::bail!("Unsupported key type: {:?}", key_type)
+            }
         }
     } else {
+        debug!("KeyType attribute not found in response");
         anyhow::bail!("Could not determine key type")
     }
 }
