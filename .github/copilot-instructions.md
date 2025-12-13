@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A Rust PKCS#11 CLI tool for interfacing with **SoftHSM2** in a single Docker container. Provides repeatable HSM-style workflows for token management, asymmetric/symmetric key operations, signing, encryption, key wrapping, and CSR generation. This is a learning tool - not for production security.
+A Rust PKCS#11 CLI tool for interfacing with **SoftHSM2** in a single Docker container. Provides repeatable HSM-style workflows for token management, asymmetric/symmetric key operations, signing, encryption, key wrapping, CSR generation, key fingerprints, and detailed inspection. Includes HMAC, CMAC, hashing, random generation, benchmarking, and security auditing. This is a learning tool - not for production security.
 
 ## Architecture & Key Insight
 
@@ -42,14 +42,17 @@ A Rust PKCS#11 CLI tool for interfacing with **SoftHSM2** in a single Docker con
 
 ```
 crates/rust-hsm-cli/src/
-  main.rs                   # CLI entry, subcommand dispatch, PIN input handling
+  main.rs                   # CLI entry, subcommand dispatch, PIN input handling (328 lines)
+  cli.rs                    # Command definitions with clap derive macros (531 lines)
+  config.rs                 # Configuration file loading (.rust-hsm.toml)
   pkcs11/
     mod.rs                  # Module exports (thin layer)
     errors.rs               # Custom Pkcs11Error type wrapping cryptoki::error::Error
-    info.rs                 # Module/slot information commands
+    info.rs                 # Module/slot/mechanism information with --detailed flags (179 lines)
     slots.rs                # Slot enumeration
     token.rs                # Token init, PIN setup
-    objects.rs              # Object listing
+    objects.rs              # Object listing with --detailed flag (p11ls-style) (245 lines)
+    audit.rs                # Security audit with severity levels and issue detection
     keys/
       mod.rs                # Re-exports all key operations
       utils.rs              # Shared helpers: find_token_slot, mechanism_name, get_key_type
@@ -59,6 +62,10 @@ crates/rust-hsm-cli/src/
       export.rs             # PEM export for public keys
       wrap.rs               # AES Key Wrap (RFC 3394)
       csr.rs                # X.509 CSR generation
+      inspect.rs            # Key attribute inspection with SHA-256 fingerprints (401 lines)
+      hash.rs               # SHA-256/384/512/224/1 hashing (no login required)
+      hmac.rs               # HMAC-SHA1/224/256/384/512 operations
+      benchmark.rs          # Performance benchmarking suite
 ```
 
 ## Development Workflow
@@ -82,7 +89,7 @@ docker exec rust-hsm-app rust-hsm-cli info
 
 ### Testing
 ```bash
-docker exec rust-hsm-app /app/test.sh  # Run full integration test suite (24 tests)
+docker exec rust-hsm-app /app/test.sh  # Run full integration test suite (40 tests)
 ```
 
 ### Reset Token State
@@ -173,6 +180,52 @@ Encrypted files have this structure (implemented in [symmetric.rs](../crates/rus
 4. Add match arm in `main()` to dispatch to your function
 5. Add test case to [test.sh](../test.sh) if it's a core operation
 
+### Important Refactoring: CLI Structure
+
+**Major refactor (Dec 2025)**: Split `main.rs` (863 lines) into focused modules:
+- **cli.rs (531 lines)**: All `Commands` enum definitions with clap derive macros
+- **main.rs (328 lines)**: Command dispatch, PIN handling, error handling
+- **Benefits**: Cleaner separation, easier to add commands, better IDE navigation
+
+When adding new commands:
+1. Define command struct in `cli.rs` with clap attributes
+2. Add variant to `Commands` enum
+3. Handle in `main.rs` match statement
+4. Implement business logic in appropriate `pkcs11/*.rs` module
+
+### Key Fingerprints (NEW!)
+
+**SHA-256 fingerprints** for public key verification (like SSH fingerprints):
+- Displayed automatically in `inspect-key` output
+- Format: colon-separated hex (e.g., `ec:bb:93:16:a4:7c:...`)
+- RSA: Hash of modulus + public exponent
+- ECDSA: Hash of EC params + EC point
+- Included in JSON output for automation
+- Implementation: [inspect.rs calculate_fingerprint()](../crates/rust-hsm-cli/src/pkcs11/keys/inspect.rs)
+
+### Detailed Listing Flags (NEW!)
+
+**--detailed flag pattern** for enhanced output:
+
+1. **list-mechanisms --detailed**: Shows capability flags (like p11slotinfo)
+   ```
+   CKM_RSA_PKCS                               enc dec sig vfy wra unw
+   CKM_AES_GCM                                enc dec
+   ```
+   Flags: enc, dec, sig, vfy, hsh, gkp, wra, unw, der, srec, vrec, gen
+
+2. **list-objects --detailed**: Shows p11ls-style attributes
+   ```
+   prvk/rsa   my-key                               tok,prv,r/w,loc,sen,ase,nxt,XTR,sig,dec,unw,rsa(2048)
+   pubk/ec    ec-key                               tok,pub,r/w,loc,vfy,enc,wra
+   ```
+   Attributes: tok, prv/pub, r/w/r/o, loc/imp, sig, vfy, enc, dec, wra, unw, der, sen, ase, nxt, XTR
+
+**Implementation notes**:
+- Use `MechanismInfo` from cryptoki for mechanism capabilities
+- Format helpers in [info.rs format_mechanism_flags()](../crates/rust-hsm-cli/src/pkcs11/info.rs)
+- Object details in [objects.rs get_detailed_object_info()](../crates/rust-hsm-cli/src/pkcs11/objects.rs)
+
 ### Finding Keys by Label
 
 Use the pattern from [utils.rs](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs#L38-L49):
@@ -198,7 +251,7 @@ Check [utils.rs mechanism_name()](../crates/rust-hsm-cli/src/pkcs11/keys/utils.r
 
 ### Run Full Test Suite
 ```bash
-docker exec rust-hsm-app /app/test.sh  # 24 tests: RSA, ECDSA, AES, wrap/unwrap, CSR
+docker exec rust-hsm-app /app/test.sh  # 40 tests: RSA, ECDSA, AES, wrap/unwrap, CSR, hash, HMAC, CMAC, fingerprints
 ```
 
 ### Debug Mode
@@ -226,8 +279,10 @@ docker compose up -d --build
 ### Current Limitations
 
 **1. `cryptoki` v0.10 Mechanism Coverage**
-- **Missing**: AES-CMAC (`CKM_AES_CMAC`, `CKM_AES_CMAC_GENERAL`) - check if newer versions support this
-- **Missing**: HMAC operations (SHA-256/SHA-384/SHA-512 HMAC)
+- **✅ Implemented**: AES-CMAC (`CKM_AES_CMAC`, `CKM_AES_CMAC_GENERAL`) - full support including truncated MACs
+- **✅ Implemented**: HMAC operations (SHA-1/224/256/384/512) - sign and verify
+- **✅ Implemented**: Hashing (SHA-1/224/256/384/512) - no login required
+- **✅ Implemented**: Random number generation (`C_GenerateRandom`) - no login required
 - **Missing**: Raw RSA operations (OAEP padding, PSS signatures)
 - **Missing**: Key derivation functions (PBKDF2, HKDF)
 - **Note**: Upgraded from v0.6 - `GcmParams::new()` now returns `Result` and requires mutable IV reference
@@ -239,7 +294,10 @@ docker compose up -d --build
 - **No ECDH**: Key agreement not implemented
 
 **3. Key Management**
-- **No key attributes inspection**: Can't query key size, usage flags, or extractability after creation
+- **✅ Key inspection**: Detailed CKA_* attribute display with `inspect-key` command
+- **✅ Key fingerprints**: SHA-256 fingerprints for public keys (RSA & ECDSA)
+- **✅ JSON output**: Machine-readable format for automation
+- **✅ Security auditing**: Detect weak keys, improper configurations, security issues
 - **No bulk operations**: Must delete keys one at a time
 - **No key backup/restore**: Except via wrap/unwrap (requires extractable keys)
 
@@ -256,68 +314,89 @@ docker compose up -d --build
 ### Planned Future Work
 
 **High Priority**
-1. **MAC Operations** (see [IMPLEMENTING_AES_CMAC.md](../docs/IMPLEMENTING_AES_CMAC.md))
-   - Generate/verify MACs with AES-CMAC or HMAC-SHA256
-   - Commands: `gen-mac`, `verify-mac`
-   - Use case: API authentication, message integrity
+1. **✅ COMPLETED: MAC Operations**
+   - HMAC (SHA-1/224/256/384/512): `hmac-sign`, `hmac-verify`
+   - AES-CMAC: `cmac-sign`, `cmac-verify` with optional truncation
+   - See [IMPLEMENTING_AES_CMAC.md](../docs/IMPLEMENTING_AES_CMAC.md) for implementation details
 
-2. **Key Attribute Inspection**
-   ```bash
-   rust-hsm-cli inspect-key --label TOKEN --user-pin PIN --key-label KEY
-   # Output: key type, size, extractable, usage flags, creation date
-   ```
+2. **✅ COMPLETED: Key Attribute Inspection**
+   - `inspect-key` command with detailed CKA_* attributes
+   - SHA-256 fingerprints for public keys
+   - JSON output support with `--json` flag
+   - Distinguishes between RSA and ECDSA keys automatically
 
-3. **Batch Operations**
+3. **✅ COMPLETED: Detailed Object/Mechanism Listing**
+   - `list-objects --detailed` shows p11ls-style output (type, flags, capabilities, sizes)
+   - `list-mechanisms --detailed` shows p11slotinfo-style capabilities (enc/dec/sig/vfy/etc)
+   - Supports `--slot` parameter for specific slot queries
+
+4. **✅ COMPLETED: Security Auditing**
+   - `audit` command detects weak keys, configuration issues, security problems
+   - Severity levels: CRITICAL, HIGH, MEDIUM, LOW
+   - Grouped by category for easy remediation
+
+5. **Find Orphaned Keys**
    ```bash
    rust-hsm-cli delete-all-keys --label TOKEN --user-pin PIN --pattern "temp-*"
    rust-hsm-cli list-keys --label TOKEN --user-pin PIN --format json
    ```
 
-4. **RSA-OAEP Support**
+   - Detect private keys without public keys (and vice versa)
+   - Commands: `find-orphaned-keys`
+   - Useful for cleanup and troubleshooting
+
+6. **Compare Keys**
+   - Side-by-side comparison of key attributes
+   - Useful for troubleshooting key mismatches
+   - Commands: `compare-keys --key-label KEY1 --key-label KEY2`
+
+7. **RSA-OAEP Support**
    - Larger payload encryption (up to key_size - 66 bytes for SHA-256)
    - Stronger security than PKCS#1 v1.5
    - Requires `cryptoki` enum extension or raw mechanism
 
-5. **Additional Curves**
+8. **Additional Curves**
    - P-521 for ECDSA
    - Curve25519 (Ed25519 signatures, X25519 ECDH)
    - Check `cryptoki` version support
 
 **Medium Priority**
-6. **Key Derivation Functions**
+9. **Key Derivation Functions**
    - PBKDF2 for password-based key derivation
    - HKDF for key stretching
    - Useful for deriving encryption keys from passwords
 
-7. **Session Management**
+10. **Batch Operations**
+   ```bash
+   rust-hsm-cli delete-all-keys --label TOKEN --user-pin PIN --pattern "temp-*"
+   rust-hsm-cli list-keys --label TOKEN --user-pin PIN --format json
+   ```
+
+11. **Session Management**
    - Persistent sessions (avoid login for multiple operations)
    - Read-only session optimization (currently opens RW for everything)
 
-8. **PIN Management**
+12. **PIN Management**
    - Change user PIN command
    - Change SO PIN command
    - PIN complexity validation
 
-9. **Certificate Management**
+13. **Certificate Management**
    - Import X.509 certificates to token
    - Link certificates to keypairs
    - Certificate chain validation
 
 **Low Priority**
-10. **Multi-token Operations**
+14. **Multi-token Operations**
     - Copy keys between tokens
     - Compare token contents
     - Synchronize key sets
 
-11. **Audit Logging**
-    - Structured JSON logs for operations
-    - Audit trail for key usage
-    - Compliance reporting
-
-12. **Performance Benchmarking**
-    - Measure sign/verify throughput
-    - Measure encrypt/decrypt latency
-    - Compare mechanisms (RSA vs ECDSA)
+15. **✅ COMPLETED: Performance Benchmarking**
+    - `benchmark` command with full suite or specific key testing
+    - Measures ops/sec and latency (P50/P95/P99)
+    - Tests: RSA/ECDSA signing, encryption, hashing, MACs, random generation
+    - Auto-detects key types and capabilities
 
 ### Contributing Notes
 
