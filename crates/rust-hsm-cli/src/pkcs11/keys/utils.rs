@@ -1,9 +1,25 @@
 use cryptoki::context::{CInitializeArgs, Pkcs11};
+use cryptoki::mechanism::Mechanism;
 use cryptoki::object::{Attribute, AttributeType, ObjectHandle};
 use cryptoki::session::{Session, UserType};
 use cryptoki::slot::Slot;
 use cryptoki::types::AuthPin;
 use tracing::{debug, info};
+
+/// Convert a Mechanism to its CKM_ name for logging
+pub(super) fn mechanism_name(mechanism: &Mechanism) -> &'static str {
+    match mechanism {
+        Mechanism::RsaPkcsKeyPairGen => "CKM_RSA_PKCS_KEY_PAIR_GEN",
+        Mechanism::EccKeyPairGen => "CKM_EC_KEY_PAIR_GEN",
+        Mechanism::Sha256RsaPkcs => "CKM_SHA256_RSA_PKCS",
+        Mechanism::Ecdsa => "CKM_ECDSA",
+        Mechanism::RsaPkcs => "CKM_RSA_PKCS",
+        Mechanism::AesKeyGen => "CKM_AES_KEY_GEN",
+        Mechanism::AesGcm(_) => "CKM_AES_GCM",
+        Mechanism::AesKeyWrap => "CKM_AES_KEY_WRAP",
+        _ => "CKM_UNKNOWN",
+    }
+}
 
 pub(super) fn find_token_slot(pkcs11: &Pkcs11, label: &str) -> anyhow::Result<Slot> {
     debug!("→ Calling C_GetSlotList to find token");

@@ -6,7 +6,7 @@ use cryptoki::types::AuthPin;
 use std::fs;
 use tracing::{debug, info, trace};
 
-use super::utils::{find_token_slot, get_key_type};
+use super::utils::{find_token_slot, get_key_type, mechanism_name};
 
 pub fn sign(
     module_path: &str,
@@ -54,7 +54,7 @@ pub fn sign(
         cryptoki::object::KeyType::RSA => Mechanism::Sha256RsaPkcs,
         cryptoki::object::KeyType::EC => Mechanism::Ecdsa,
         _ => anyhow::bail!("Unsupported key type for signing: {:?}", key_type),
-    };
+    };    debug!("Using verification mechanism: {}", mechanism_name(&mechanism));    debug!("Using signing mechanism: {}", mechanism_name(&mechanism));
 
     let signature = if key_type == cryptoki::object::KeyType::EC {
         // For ECDSA, we hash the data first
@@ -234,8 +234,9 @@ pub fn encrypt(
     }
 
     // Encrypt using RSA PKCS#1 v1.5
-    debug!("→ Calling C_EncryptInit, C_Encrypt");
     let mechanism = Mechanism::RsaPkcs;
+    debug!("Using encryption mechanism: {}", mechanism_name(&mechanism));
+    debug!("→ Calling C_EncryptInit, C_Encrypt");
     let ciphertext = session.encrypt(&mechanism, public_key, &plaintext)?;
     
     info!("Encrypted {} bytes to {} bytes", plaintext.len(), ciphertext.len());
@@ -309,8 +310,9 @@ pub fn decrypt(
     info!("Read {} bytes from {}", ciphertext.len(), input_path);
 
     // Decrypt using RSA PKCS#1 v1.5
-    debug!("→ Calling C_DecryptInit, C_Decrypt");
     let mechanism = Mechanism::RsaPkcs;
+    debug!("Using decryption mechanism: {}", mechanism_name(&mechanism));
+    debug!("→ Calling C_DecryptInit, C_Decrypt");
     let plaintext = session.decrypt(&mechanism, private_key, &ciphertext)?;
     
     info!("Decrypted {} bytes to {} bytes", ciphertext.len(), plaintext.len());

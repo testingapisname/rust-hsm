@@ -6,7 +6,7 @@ use cryptoki::types::AuthPin;
 use std::fs;
 use tracing::{debug, info, trace};
 
-use super::utils::find_token_slot;
+use super::utils::{find_token_slot, mechanism_name};
 
 pub fn gen_symmetric_key(
     module_path: &str,
@@ -43,8 +43,9 @@ pub fn gen_symmetric_key(
     }
 
     // Generate AES key
-    debug!("→ Calling C_GenerateKey");
     let mechanism = Mechanism::AesKeyGen;
+    debug!("Using key generation mechanism: {}", mechanism_name(&mechanism));
+    debug!("→ Calling C_GenerateKey");
     let key_template = vec![
         Attribute::Token(true),
         Attribute::Label(key_label.as_bytes().to_vec()),
@@ -130,8 +131,9 @@ pub fn encrypt_symmetric(
     trace!("Generated IV: {} bytes", iv.len());
 
     // Encrypt using AES-GCM
-    debug!("→ Calling C_EncryptInit, C_Encrypt");
     let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&iv, &[], 128u64.into()));
+    debug!("Using encryption mechanism: {}", mechanism_name(&mechanism));
+    debug!("→ Calling C_EncryptInit, C_Encrypt");
     let ciphertext = session.encrypt(&mechanism, key, &plaintext)?;
     
     info!("Encrypted {} bytes to {} bytes", plaintext.len(), ciphertext.len());
@@ -218,8 +220,9 @@ pub fn decrypt_symmetric(
     trace!("Extracted IV: {} bytes, ciphertext: {} bytes", iv.len(), ciphertext.len());
 
     // Decrypt using AES-GCM
-    debug!("→ Calling C_DecryptInit, C_Decrypt");
     let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(iv, &[], 128u64.into()));
+    debug!("Using decryption mechanism: {}", mechanism_name(&mechanism));
+    debug!("→ Calling C_DecryptInit, C_Decrypt");
     let plaintext = session.decrypt(&mechanism, key, ciphertext)?;
     
     info!("Decrypted {} bytes to {} bytes", ciphertext.len(), plaintext.len());

@@ -5,7 +5,7 @@ use cryptoki::session::UserType;
 use cryptoki::types::AuthPin;
 use tracing::{debug, info};
 
-use super::utils::find_token_slot;
+use super::utils::{find_token_slot, mechanism_name};
 
 pub fn gen_keypair(
     module_path: &str,
@@ -35,8 +35,8 @@ pub fn gen_keypair(
 
     match key_type.to_lowercase().as_str() {
         "rsa" => {
-            debug!("Using RSA key generation mechanism");
             let mechanism = Mechanism::RsaPkcsKeyPairGen;
+            debug!("Using key generation mechanism: {}", mechanism_name(&mechanism));
             debug!("Generating RSA-{} keypair", bits);
             
             let public_key_template = vec![
@@ -70,8 +70,8 @@ pub fn gen_keypair(
             println!("  Private key handle: {:?}", private_key);
         }
         "ecdsa" | "ec" | "p256" | "p384" => {
-            debug!("Using ECDSA key generation mechanism");
             let mechanism = Mechanism::EccKeyPairGen;
+            debug!("Using key generation mechanism: {}", mechanism_name(&mechanism));
             
             // EC parameters: ANSI X9.62 named curves
             let ec_params = match key_type.to_lowercase().as_str() {

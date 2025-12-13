@@ -9,7 +9,7 @@ use simple_asn1::{ASN1Block, ASN1Class, OID, BigInt, BigUint, to_der};
 use sha2::{Sha256, Digest};
 use base64::Engine as _;
 
-use super::utils::{find_token_slot, get_key_type};
+use super::utils::{find_token_slot, get_key_type, mechanism_name};
 
 /// Helper to create OID from integers
 fn oid(components: &[u64]) -> OID {
@@ -325,7 +325,8 @@ fn sign_tbs(
     match *key_type {
         KeyType::RSA => {
             let mechanism = Mechanism::Sha256RsaPkcs;
-            debug!("→ Calling C_Sign (RSA)");
+            debug!("Using CSR signing mechanism: {}", mechanism_name(&mechanism));
+            debug!("→ Calling C_Sign");
             let signature = session.sign(&mechanism, private_key_handle, tbs_bytes)?;
             Ok(signature)
         }
@@ -336,7 +337,8 @@ fn sign_tbs(
             let hash = hasher.finalize();
             
             let mechanism = Mechanism::Ecdsa;
-            debug!("→ Calling C_Sign (ECDSA)");
+            debug!("Using CSR signing mechanism: {}", mechanism_name(&mechanism));
+            debug!("→ Calling C_Sign");
             let signature = session.sign(&mechanism, private_key_handle, &hash)?;
             Ok(signature)
         }

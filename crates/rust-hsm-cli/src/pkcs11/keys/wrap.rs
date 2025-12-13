@@ -6,7 +6,7 @@ use cryptoki::types::AuthPin;
 use std::fs;
 use tracing::{debug, info};
 
-use super::utils::find_token_slot;
+use super::utils::{find_token_slot, mechanism_name};
 
 pub fn wrap_key(
     module_path: &str,
@@ -48,8 +48,9 @@ pub fn wrap_key(
     debug!("Found wrapping key with handle: {:?}", wrapping_key);
 
     // Wrap the key using AES Key Wrap (RFC 3394)
-    debug!("→ Calling C_WrapKey with AES Key Wrap mechanism");
     let mechanism = Mechanism::AesKeyWrap;
+    debug!("Using key wrapping mechanism: {}", mechanism_name(&mechanism));
+    debug!("→ Calling C_WrapKey");
     let wrapped_key = session.wrap_key(&mechanism, wrapping_key, key_to_wrap)?;
     
     info!("Key wrapped successfully: {} bytes", wrapped_key.len());
@@ -131,8 +132,9 @@ pub fn unwrap_key(
     };
 
     // Unwrap the key using AES Key Wrap (RFC 3394)
-    debug!("→ Calling C_UnwrapKey with AES Key Wrap mechanism");
     let mechanism = Mechanism::AesKeyWrap;
+    debug!("Using key unwrapping mechanism: {}", mechanism_name(&mechanism));
+    debug!("→ Calling C_UnwrapKey");
     let unwrapped_key = session.unwrap_key(&mechanism, wrapping_key, &wrapped_key, &key_template)?;
     
     println!("Key '{}' unwrapped successfully", key_label);
