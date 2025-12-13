@@ -14,6 +14,7 @@ pub fn gen_keypair(
     key_label: &str,
     key_type: &str,
     bits: u32,
+    extractable: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -49,15 +50,19 @@ pub fn gen_keypair(
                 Attribute::PublicExponent(vec![0x01, 0x00, 0x01]), // 65537
             ];
 
-            let private_key_template = vec![
+            let mut private_key_template = vec![
                 Attribute::Token(true),
                 Attribute::Label(key_label.as_bytes().to_vec()),
                 Attribute::Id(key_label.as_bytes().to_vec()),
                 Attribute::Private(true),
-                Attribute::Sensitive(true),
+                Attribute::Sensitive(!extractable),
                 Attribute::Decrypt(true),
                 Attribute::Sign(true),
             ];
+            
+            if extractable {
+                private_key_template.push(Attribute::Extractable(true));
+            }
 
             let (public_key, private_key) = session.generate_key_pair(
                 &mechanism,

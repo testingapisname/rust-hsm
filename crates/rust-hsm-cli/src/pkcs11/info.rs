@@ -1,4 +1,5 @@
 use cryptoki::context::{CInitializeArgs, Pkcs11};
+use cryptoki::mechanism::MechanismInfo;
 use tracing::{debug, trace};
 use super::mechanisms;
 
@@ -26,7 +27,7 @@ pub fn display_info(module_path: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn list_mechanisms(module_path: &str, slot_id: Option<u64>) -> anyhow::Result<()> {
+pub fn list_mechanisms(module_path: &str, slot_id: Option<u64>, detailed: bool) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("Initializing PKCS#11 library");
@@ -53,11 +54,17 @@ pub fn list_mechanisms(module_path: &str, slot_id: Option<u64>) -> anyhow::Resul
     
     println!("Total mechanisms supported: {}\n", mechanisms.len());
     
+    if detailed {
+        println!("Mechanism capabilities:");
+        println!("  enc=encrypt, dec=decrypt, sig=sign, vfy=verify, hsh=digest,");
+        println!("  gkp=gen keypair, wra=wrap, unw=unwrap, der=derive\n");
+    }
+    
     // Extract mechanism values and lookup names
     use std::collections::HashMap;
-    let mut by_category: HashMap<&str, Vec<(u64, String)>> = HashMap::new();
+    let mut by_category: HashMap<&str, Vec<(u64, String, Option<MechanismInfo>)>> = HashMap::new();
     
-    for mech in mechanisms {
+    for mech in mechanisms.iter() {
         let mech_str = format!("{:?}", mech);
         // Extract numeric value from "MechanismType { val: 1234 }" format
         let val = if let Some(start) = mech_str.find("val: ") {
@@ -74,9 +81,16 @@ pub fn list_mechanisms(module_path: &str, slot_id: Option<u64>) -> anyhow::Resul
                 .to_string();
             let category = mechanisms::mechanism_category(val);
             
+            // Get mechanism info if detailed output requested
+            let mech_info = if detailed {
+                pkcs11.get_mechanism_info(*target_slot, *mech).ok()
+            } else {
+                None
+            };
+            
             by_category.entry(category)
                 .or_insert_with(Vec::new)
-                .push((val, name));
+                .push((val, name, mech_info));
         }
     }
     
@@ -86,14 +100,30 @@ pub fn list_mechanisms(module_path: &str, slot_id: Option<u64>) -> anyhow::Resul
     
     for category in categories {
         let mut mechs = by_category.get(category).unwrap().clone();
-        mechs.sort_by_key(|(val, _)| *val);
+        mechs.sort_by_key(|(val, _, _)| *val);
         
         println!("{} ({} mechanisms):", category, mechs.len());
-        for (val, name) in mechs {
-            if name == "Unknown" {
-                println!("  0x{:08x} - {}", val, name);
+        for (val, name, mech_info) in mechs {
+            if detailed {
+                if let Some(info) = mech_info {
+                    let flags = format_mechanism_flags(&info);
+                    let name_display = if name == "Unknown" {
+                        format!("0x{:08x}", val)
+                    } else {
+                        format!("{:<42}", name)
+                    };
+                    println!("  {:<42} {}", name_display, flags);
+                } else if name == "Unknown" {
+                    println!("  0x{:08x} - {}", val, name);
+                } else {
+                    println!("  {:<42} (info unavailable)", name);
+                }
             } else {
-                println!("  {} (0x{:04x})", name, val);
+                if name == "Unknown" {
+                    println!("  0x{:08x} - {}", val, name);
+                } else {
+                    println!("  {} (0x{:04x})", name, val);
+                }
             }
         }
         println!();
@@ -101,4 +131,52 @@ pub fn list_mechanisms(module_path: &str, slot_id: Option<u64>) -> anyhow::Resul
     
     pkcs11.finalize();
     Ok(())
+}
+
+/// Format mechanism flags into a readable string
+fn format_mechanism_flags(info: &MechanismInfo) -> String {
+    let mut flags = Vec::new();
+    
+    if info.encrypt() {
+        flags.push("enc");
+    }
+    if info.decrypt() {
+        flags.push("dec");
+    }
+    if info.digest() {
+        flags.push("hsh");
+    }
+    if info.sign() {
+        flags.push("sig");
+    }
+    if info.sign_recover() {
+        flags.push("srec");
+    }
+    if info.verify() {
+        flags.push("vfy");
+    }
+    if info.verify_recover() {
+        flags.push("vrec");
+    }
+    if info.generate() {
+        flags.push("gen");
+    }
+    if info.generate_key_pair() {
+        flags.push("gkp");
+    }
+    if info.wrap() {
+        flags.push("wra");
+    }
+    if info.unwrap() {
+        flags.push("unw");
+    }
+    if info.derive() {
+        flags.push("der");
+    }
+    
+    if flags.is_empty() {
+        "---".to_string()
+    } else {
+        flags.join(" ")
+    }
 }

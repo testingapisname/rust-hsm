@@ -322,11 +322,72 @@ else
     echo "✓ CMAC verification correctly rejected tampered data"
 fi
 
-echo -e "\n${GREEN}[34/36] Testing key attribute inspection${NC}"
+echo -e "\n${GREEN}[34/39] Testing key attribute inspection${NC}"
 $CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-key 2>/dev/null | grep -q "CKA_CLASS" && echo "✓ Inspect-key displays attributes" || exit 1
 $CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-cmac-key 2>/dev/null | grep -q "CKA_VALUE_LEN" && echo "✓ AES key attributes displayed" || exit 1
 
-echo -e "\n${GREEN}[35/36] Testing random number generation (hex output)${NC}"
+echo -e "\n${GREEN}[35/39] Testing RSA key fingerprint${NC}"
+# Test fingerprint appears for RSA public key
+if $CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-key 2>/dev/null | grep -q "FINGERPRINT (SHA-256)"; then
+    echo "✓ RSA fingerprint displayed"
+else
+    echo -e "${RED}✗ RSA fingerprint not found${NC}"
+    exit 1
+fi
+# Extract fingerprint and validate format (64 hex chars with colons)
+RSA_FP=$($CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-key 2>/dev/null | grep "FINGERPRINT (SHA-256)" | awk '{print $3}')
+if [[ $RSA_FP =~ ^([0-9a-f]{2}:){31}[0-9a-f]{2}$ ]]; then
+    echo "✓ RSA fingerprint format valid (SHA-256 hex with colons)"
+else
+    echo -e "${RED}✗ RSA fingerprint format invalid: $RSA_FP${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[36/39] Testing ECDSA key fingerprint${NC}"
+# Test fingerprint appears for ECDSA public key
+if $CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-p256 2>/dev/null | grep -q "FINGERPRINT (SHA-256)"; then
+    echo "✓ ECDSA fingerprint displayed"
+else
+    echo -e "${RED}✗ ECDSA fingerprint not found${NC}"
+    exit 1
+fi
+# Extract fingerprint and validate format
+EC_FP=$($CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-p256 2>/dev/null | grep "FINGERPRINT (SHA-256)" | awk '{print $3}')
+if [[ $EC_FP =~ ^([0-9a-f]{2}:){31}[0-9a-f]{2}$ ]]; then
+    echo "✓ ECDSA fingerprint format valid (SHA-256 hex with colons)"
+else
+    echo -e "${RED}✗ ECDSA fingerprint format invalid: $EC_FP${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[37/39] Testing fingerprint consistency${NC}"
+# Verify same key produces same fingerprint
+RSA_FP2=$($CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-key 2>/dev/null | grep "FINGERPRINT (SHA-256)" | awk '{print $3}')
+if [ "$RSA_FP" = "$RSA_FP2" ]; then
+    echo "✓ Fingerprint is consistent across multiple inspections"
+else
+    echo -e "${RED}✗ Fingerprint changed: $RSA_FP vs $RSA_FP2${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[38/39] Testing JSON fingerprint output${NC}"
+# Test JSON output includes fingerprint
+if $CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-key --json 2>/dev/null | grep -q '"fingerprint"'; then
+    echo "✓ JSON output includes fingerprint field"
+else
+    echo -e "${RED}✗ JSON output missing fingerprint field${NC}"
+    exit 1
+fi
+# Extract JSON fingerprint and compare with text output
+JSON_FP=$($CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-key --json 2>/dev/null | grep '"fingerprint"' | head -1 | sed 's/.*"fingerprint": "\([^"]*\)".*/\1/')
+if [ "$RSA_FP" = "$JSON_FP" ]; then
+    echo "✓ JSON fingerprint matches text output"
+else
+    echo -e "${RED}✗ JSON fingerprint doesn't match: $RSA_FP vs $JSON_FP${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[39/40] Testing random number generation (hex output)${NC}"
 RANDOM_HEX=$($CLI gen-random --bytes 32 2>/dev/null | tail -1)
 if [ ${#RANDOM_HEX} -eq 64 ]; then
     echo "✓ Generated 32 random bytes (64 hex chars)"
@@ -335,7 +396,7 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}[36/36] Testing random number generation (file output)${NC}"
+echo -e "\n${GREEN}[40/40] Testing random number generation (file output)${NC}"
 $CLI gen-random --bytes 16 --output /app/test-random.bin && echo "✓ Random bytes written to file" || exit 1
 if [ -f /app/test-random.bin ] && [ $(wc -c < /app/test-random.bin) -eq 16 ]; then
     echo "✓ Random file size correct (16 bytes)"
