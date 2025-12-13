@@ -38,6 +38,13 @@ enum Commands {
     /// List all available slots and tokens
     ListSlots,
     
+    /// List supported mechanisms for a slot
+    ListMechanisms {
+        /// Slot ID (uses first slot if not specified)
+        #[arg(long)]
+        slot: Option<u64>,
+    },
+    
     /// Initialize a token
     InitToken {
         /// Token label (uses config default if not specified)
@@ -348,6 +355,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::ListSlots => {
             pkcs11::slots::list_slots(&module_path)?;
+        }
+        Commands::ListMechanisms { slot } => {
+            pkcs11::info::list_mechanisms(&module_path, slot)?;
         }
         Commands::InitToken { label, so_pin, pin_stdin } => {
             let token_label = config.token_label(label.as_deref())

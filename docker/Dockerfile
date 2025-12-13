@@ -16,6 +16,9 @@ RUN mkdir -p crates/rust-hsm-cli/src && \
 COPY crates/rust-hsm-cli/src crates/rust-hsm-cli/src
 RUN cd crates/rust-hsm-cli && cargo build --release
 
+# Run tests
+RUN cd crates/rust-hsm-cli && cargo test --release
+
 # Runtime stage: Debian with SoftHSM2
 FROM debian:bookworm-slim
 
