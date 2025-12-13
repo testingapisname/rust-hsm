@@ -103,6 +103,22 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         // Generic secret key
         0x00000350 => Some("CKM_GENERIC_SECRET_KEY_GEN"),
         
+        // Additional mechanisms found in SoftHSM
+        0x0000108a => Some("CKM_AES_XCBC_MAC"),
+        0x00001055 => Some("CKM_ECDH_AES_KEY_WRAP"),
+        0x00001057 => Some("CKM_ECDH_X963_KDF"),
+        0x00000270 => Some("CKM_SHA3_256"),
+        0x00000271 => Some("CKM_SHA3_256_HMAC"),
+        0x00001105 => Some("CKM_SP800_108_COUNTER_KDF"),
+        
+        // DSA mechanisms (0x0040-0x005f range)
+        0x00000040 => Some("CKM_DSA_PARAMETER_GEN"),
+        0x00000041 => Some("CKM_DSA_PROBABLISTIC_PARAMETER_GEN"),
+        0x00000042 => Some("CKM_DSA_SHAWE_TAYLOR_PARAMETER_GEN"),
+        0x00000043 => Some("CKM_DSA_FIPS_G_GEN"),
+        0x00000044 => Some("CKM_AES_OFB"),
+        0x00000045 => Some("CKM_AES_CFB64"),
+        
         _ => None,
     }
 }
