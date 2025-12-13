@@ -49,13 +49,17 @@ fi
 
 CLI="$EXEC_PREFIX rust-hsm-cli"
 
-echo -e "\n${GREEN}[1/10] Testing info command${NC}"
+echo -e "\n${GREEN}[1/11] Testing info command${NC}"
 $CLI info | grep -q "SoftHSM" && echo "✓ Info command works" || exit 1
 
-echo -e "\n${GREEN}[2/10] Testing list-slots command${NC}"
+echo -e "\n${GREEN}[2/11] Testing list-slots command${NC}"
 $CLI list-slots | grep -q "Slot" && echo "✓ List-slots command works" || exit 1
 
-echo -e "\n${GREEN}[3/10] Initializing test token${NC}"
+echo -e "\n${GREEN}[3/11] Testing list-mechanisms command${NC}"
+$CLI list-mechanisms | grep -q "Total mechanisms supported: 40" && echo "✓ List-mechanisms command works" || exit 1
+$CLI list-mechanisms | grep -q "CKM_AES_GCM" && echo "✓ Mechanism names decoded correctly" || exit 1
+
+echo -e "\n${GREEN}[4/11] Initializing test token${NC}"
 # Note: SoftHSM will pick an available slot. If slot 0 is taken, it uses the next available.
 $CLI init-token --label "$TEST_TOKEN" --so-pin "$SO_PIN" && echo "✓ Token initialized" || {
     echo -e "${RED}Failed to initialize token. This may happen if all slots are occupied.${NC}"
@@ -63,19 +67,19 @@ $CLI init-token --label "$TEST_TOKEN" --so-pin "$SO_PIN" && echo "✓ Token init
     exit 1
 }
 
-echo -e "\n${GREEN}[4/10] Setting user PIN${NC}"
+echo -e "\n${GREEN}[5/11] Setting user PIN${NC}"
 $CLI init-pin --label "$TEST_TOKEN" --so-pin "$SO_PIN" --user-pin "$USER_PIN" && echo "✓ User PIN set" || exit 1
 
-echo -e "\n${GREEN}[5/10] Listing objects (should be empty)${NC}"
+echo -e "\n${GREEN}[6/11] Listing objects (should be empty)${NC}"
 $CLI list-objects --label "$TEST_TOKEN" --user-pin "$USER_PIN" | grep -q "Objects on token" && echo "✓ List objects works" || exit 1
 
-echo -e "\n${GREEN}[6/10] Generating RSA-2048 keypair${NC}"
+echo -e "\n${GREEN}[7/11] Generating RSA-2048 keypair${NC}"
 $CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --key-type rsa --bits 2048 && echo "✓ Keypair generated" || exit 1
 
-echo -e "\n${GREEN}[7/10] Verifying key exists${NC}"
+echo -e "\n${GREEN}[8/11] Verifying key exists${NC}"
 $CLI list-objects --label "$TEST_TOKEN" --user-pin "$USER_PIN" | grep -q "$TEST_KEY" && echo "✓ Key visible in objects" || exit 1
 
-echo -e "\n${GREEN}[8/10] Creating test data and signing${NC}"
+echo -e "\n${GREEN}[9/11] Creating test data and signing${NC}"
 if [ -n "$DOCKER_CONTAINER" ]; then
     docker exec $DOCKER_CONTAINER bash -c "echo 'Test data for signing' > /app/test-data.txt"
 else
@@ -83,10 +87,10 @@ else
 fi
 $CLI sign --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --input /app/test-data.txt --output /app/test-data.sig && echo "✓ Data signed" || exit 1
 
-echo -e "\n${GREEN}[9/10] Verifying signature${NC}"
+echo -e "\n${GREEN}[10/11] Verifying signature${NC}"
 $CLI verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --input /app/test-data.txt --signature /app/test-data.sig && echo "✓ Signature verified" || exit 1
 
-echo -e "\n${GREEN}[10/10] Testing tampered data (should fail)${NC}"
+echo -e "\n${GREEN}[11/11] Testing tampered data (should fail)${NC}"
 if [ -n "$DOCKER_CONTAINER" ]; then
     docker exec $DOCKER_CONTAINER bash -c "echo 'TAMPERED DATA' > /app/test-tampered.txt"
 else
@@ -99,10 +103,10 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}[11/13] Generating P-256 ECDSA keypair${NC}"
+echo -e "\n${GREEN}[12/14] Generating P-256 ECDSA keypair${NC}"
 $CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p256" --key-type p256 && echo "✓ P-256 keypair generated" || exit 1
 
-echo -e "\n${GREEN}[12/13] Testing P-256 ECDSA sign/verify${NC}"
+echo -e "\n${GREEN}[13/14] Testing P-256 ECDSA sign/verify${NC}"
 if [ -n "$DOCKER_CONTAINER" ]; then
     docker exec $DOCKER_CONTAINER bash -c "echo 'ECDSA test data' > /app/test-ec.txt"
 else
@@ -111,22 +115,22 @@ fi
 $CLI sign --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p256" --input /app/test-ec.txt --output /app/test-ec-p256.sig && echo "✓ P-256 data signed" || exit 1
 $CLI verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p256" --input /app/test-ec.txt --signature /app/test-ec-p256.sig && echo "✓ P-256 signature verified" || exit 1
 
-echo -e "\n${GREEN}[13/15] Testing P-384 ECDSA sign/verify${NC}"
+echo -e "\n${GREEN}[14/16] Testing P-384 ECDSA sign/verify${NC}"
 $CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p384" --key-type p384 && echo "✓ P-384 keypair generated" || exit 1
 $CLI sign --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p384" --input /app/test-ec.txt --output /app/test-ec-p384.sig && echo "✓ P-384 data signed" || exit 1
 $CLI verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p384" --input /app/test-ec.txt --signature /app/test-ec-p384.sig && echo "✓ P-384 signature verified" || exit 1
 
-echo -e "\n${GREEN}[14/15] Testing RSA public key export${NC}"
+echo -e "\n${GREEN}[15/16] Testing RSA public key export${NC}"
 $CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --output /app/test-rsa-export.pem && echo "✓ RSA public key exported" || exit 1
 openssl rsa -pubin -in /app/test-rsa-export.pem -text -noout > /dev/null 2>&1 && echo "✓ RSA PEM format valid" || exit 1
 
-echo -e "\n${GREEN}[15/18] Testing ECDSA public key export${NC}"
+echo -e "\n${GREEN}[16/19] Testing ECDSA public key export${NC}"
 $CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p256" --output /app/test-p256-export.pem && echo "✓ P-256 public key exported" || exit 1
 openssl ec -pubin -in /app/test-p256-export.pem -text -noout > /dev/null 2>&1 && echo "✓ P-256 PEM format valid" || exit 1
 $CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p384" --output /app/test-p384-export.pem && echo "✓ P-384 public key exported" || exit 1
 openssl ec -pubin -in /app/test-p384-export.pem -text -noout > /dev/null 2>&1 && echo "✓ P-384 PEM format valid" || exit 1
 
-echo -e "\n${GREEN}[16/18] Testing RSA encryption/decryption${NC}"
+echo -e "\n${GREEN}[17/19] Testing RSA encryption/decryption${NC}"
 if [ -n "$DOCKER_CONTAINER" ]; then
     docker exec $DOCKER_CONTAINER bash -c "echo 'Secret test message' > /app/test-encrypt.txt"
 else
@@ -146,7 +150,7 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}[17/18] Testing key deletion${NC}"
+echo -e "\n${GREEN}[18/19] Testing key deletion${NC}"
 $CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "delete-me" --key-type rsa --bits 2048 && echo "✓ Temporary key created" || exit 1
 $CLI delete-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "delete-me" && echo "✓ Key deleted successfully" || exit 1
 if $CLI list-objects --label "$TEST_TOKEN" --user-pin "$USER_PIN" 2>&1 | grep -q "delete-me"; then
@@ -156,7 +160,7 @@ else
     echo "✓ Key no longer exists"
 fi
 
-echo -e "\n${GREEN}[18/21] Testing delete of non-existent key (should fail)${NC}"
+echo -e "\n${GREEN}[19/22] Testing delete of non-existent key (should fail)${NC}"
 if $CLI delete-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "nonexistent" 2>&1 | grep -q "not found"; then
     echo "✓ Correctly reported non-existent key"
 else
@@ -164,7 +168,7 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}[19/21] Testing AES symmetric key generation${NC}"
+echo -e "\n${GREEN}[20/22] Testing AES symmetric key generation${NC}"
 $CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-test" --bits 256 && echo "✓ AES-256 key generated" || exit 1
 if $CLI list-objects --label "$TEST_TOKEN" --user-pin "$USER_PIN" 2>&1 | grep -q "aes-test"; then
     echo "✓ AES key visible in objects"
@@ -173,7 +177,7 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}[20/21] Testing AES-GCM encryption/decryption${NC}"
+echo -e "\n${GREEN}[21/22] Testing AES-GCM encryption/decryption${NC}"
 if [ -n "$DOCKER_CONTAINER" ]; then
     docker exec $DOCKER_CONTAINER bash -c "echo 'AES test message with more data than RSA can handle!' > /app/test-aes.txt"
 else
@@ -193,11 +197,11 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}[21/23] Testing AES key sizes${NC}"
+echo -e "\n${GREEN}[22/24] Testing AES key sizes${NC}"
 $CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-128" --bits 128 && echo "✓ AES-128 key generated" || exit 1
 $CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-192" --bits 192 && echo "✓ AES-192 key generated" || exit 1
 
-echo -e "\n${GREEN}[22/23] Testing key wrapping (AES Key Wrap)${NC}"
+echo -e "\n${GREEN}[24/25] Testing key wrapping (AES Key Wrap)${NC}"
 # Generate wrapping key (KEK)
 $CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "kek" --bits 256 && echo "✓ KEK generated" || exit 1
 # Generate extractable key to wrap
@@ -212,7 +216,7 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}[23/24] Testing key unwrapping${NC}"
+echo -e "\n${GREEN}[24/25] Testing key unwrapping${NC}"
 # Unwrap the key with a new label
 $CLI unwrap-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "unwrapped-key" --wrapping-key-label "kek" --input /app/test-wrapped.bin --key-type aes && echo "✓ Key unwrapped" || exit 1
 # Verify unwrapped key exists in HSM
@@ -223,7 +227,7 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}[24/24] Testing CSR generation${NC}"
+echo -e "\n${GREEN}[25/25] Testing CSR generation${NC}"
 # Generate CSR from existing RSA keypair
 $CLI gen-csr --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --subject "CN=test.example.com,O=TestOrg,C=US" --output /app/test.csr && echo "✓ CSR generated" || exit 1
 # Verify CSR file exists and is valid
@@ -235,3 +239,4 @@ else
 fi
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
+
