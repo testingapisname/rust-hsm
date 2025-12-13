@@ -313,7 +313,7 @@ fi
 echo -e "\n${GREEN}[32/33] Testing CMAC verification (valid)${NC}"
 $CLI cmac-verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-cmac-key --input /app/test-cmac-data.txt --cmac /app/test-cmac.mac && echo "✓ CMAC verification successful" || exit 1
 
-echo -e "\n${GREEN}[33/33] Testing CMAC verification failure (tampered data)${NC}"
+echo -e "\n${GREEN}[33/34] Testing CMAC verification failure (tampered data)${NC}"
 echo "TAMPERED data" > /app/test-cmac-data.txt
 if $CLI cmac-verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-cmac-key --input /app/test-cmac-data.txt --cmac /app/test-cmac.mac 2>/dev/null; then
     echo -e "${RED}✗ CMAC verification should have failed for tampered data${NC}"
@@ -321,6 +321,10 @@ if $CLI cmac-verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label tes
 else
     echo "✓ CMAC verification correctly rejected tampered data"
 fi
+
+echo -e "\n${GREEN}[34/34] Testing key attribute inspection${NC}"
+$CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-key 2>/dev/null | grep -q "CKA_CLASS" && echo "✓ Inspect-key displays attributes" || exit 1
+$CLI inspect-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-cmac-key 2>/dev/null | grep -q "CKA_VALUE_LEN" && echo "✓ AES key attributes displayed" || exit 1
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
 

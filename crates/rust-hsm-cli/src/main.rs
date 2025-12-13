@@ -182,6 +182,20 @@ enum Commands {
         pin_stdin: bool,
     },
     
+    /// Inspect detailed key attributes (CKA_* values)
+    InspectKey {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
     /// Encrypt data with an RSA public key
     Encrypt {
         /// Token label (uses config default if not specified)
@@ -603,6 +617,16 @@ fn main() -> anyhow::Result<()> {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
             pkcs11::keys::delete_key(&module_path, &token_label, &user_pin_value, &key_label)?;
+        }
+        Commands::InspectKey { label, user_pin, key_label, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::keys::inspect_key(&module_path, &token_label, &user_pin_value, &key_label)?;
         }
         Commands::Encrypt { label, user_pin, key_label, input, output, pin_stdin } => {
             let token_label = config.token_label(label.as_deref())
