@@ -97,9 +97,19 @@ fi
 $CLI sign --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p256" --input /app/test-ec.txt --output /app/test-ec-p256.sig && echo "✓ P-256 data signed" || exit 1
 $CLI verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p256" --input /app/test-ec.txt --signature /app/test-ec-p256.sig && echo "✓ P-256 signature verified" || exit 1
 
-echo -e "\n${GREEN}[13/13] Testing P-384 ECDSA sign/verify${NC}"
+echo -e "\n${GREEN}[13/15] Testing P-384 ECDSA sign/verify${NC}"
 $CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p384" --key-type p384 && echo "✓ P-384 keypair generated" || exit 1
 $CLI sign --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p384" --input /app/test-ec.txt --output /app/test-ec-p384.sig && echo "✓ P-384 data signed" || exit 1
 $CLI verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p384" --input /app/test-ec.txt --signature /app/test-ec-p384.sig && echo "✓ P-384 signature verified" || exit 1
+
+echo -e "\n${GREEN}[14/15] Testing RSA public key export${NC}"
+$CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --output /app/test-rsa-export.pem && echo "✓ RSA public key exported" || exit 1
+openssl rsa -pubin -in /app/test-rsa-export.pem -text -noout > /dev/null 2>&1 && echo "✓ RSA PEM format valid" || exit 1
+
+echo -e "\n${GREEN}[15/15] Testing ECDSA public key export${NC}"
+$CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p256" --output /app/test-p256-export.pem && echo "✓ P-256 public key exported" || exit 1
+openssl ec -pubin -in /app/test-p256-export.pem -text -noout > /dev/null 2>&1 && echo "✓ P-256 PEM format valid" || exit 1
+$CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-p384" --output /app/test-p384-export.pem && echo "✓ P-384 public key exported" || exit 1
+openssl ec -pubin -in /app/test-p384-export.pem -text -noout > /dev/null 2>&1 && echo "✓ P-384 PEM format valid" || exit 1
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
