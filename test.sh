@@ -179,8 +179,45 @@ else
     exit 1
 fi
 
-echo -e "\n${GREEN}[21/21] Testing AES key sizes${NC}"
+echo -e "\n${GREEN}[21/23] Testing AES key sizes${NC}"
 $CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-128" --bits 128 && echo "✓ AES-128 key generated" || exit 1
 $CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "aes-192" --bits 192 && echo "✓ AES-192 key generated" || exit 1
+
+echo -e "\n${GREEN}[22/23] Testing key wrapping (AES Key Wrap)${NC}"
+# Generate wrapping key (KEK)
+$CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "kek" --bits 256 && echo "✓ KEK generated" || exit 1
+# Generate extractable key to wrap
+$CLI gen-symmetric-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "wrap-me" --bits 256 --extractable && echo "✓ Extractable key generated" || exit 1
+# Wrap the key
+$CLI wrap-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "wrap-me" --wrapping-key-label "kek" --output /app/test-wrapped.bin && echo "✓ Key wrapped" || exit 1
+# Verify wrapped key file exists and has content
+if [ -f /app/test-wrapped.bin ] && [ -s /app/test-wrapped.bin ]; then
+    echo "✓ Wrapped key file created ($(wc -c < /app/test-wrapped.bin) bytes)"
+else
+    echo -e "${RED}✗ Wrapped key file not created${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[23/24] Testing key unwrapping${NC}"
+# Unwrap the key with a new label
+$CLI unwrap-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "unwrapped-key" --wrapping-key-label "kek" --input /app/test-wrapped.bin --key-type aes && echo "✓ Key unwrapped" || exit 1
+# Verify unwrapped key exists in HSM
+if $CLI list-objects --label "$TEST_TOKEN" --user-pin "$USER_PIN" 2>&1 | grep -q "unwrapped-key"; then
+    echo "✓ Unwrapped key visible in HSM"
+else
+    echo -e "${RED}✗ Unwrapped key not found in HSM${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[24/24] Testing CSR generation${NC}"
+# Generate CSR from existing RSA keypair
+$CLI gen-csr --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --subject "CN=test.example.com,O=TestOrg,C=US" --output /app/test.csr && echo "✓ CSR generated" || exit 1
+# Verify CSR file exists and is valid
+if [ -f /app/test.csr ] && openssl req -in /app/test.csr -noout -text > /dev/null 2>&1; then
+    echo "✓ CSR file valid ($(wc -c < /app/test.csr) bytes)"
+else
+    echo -e "${RED}✗ CSR file invalid or not created${NC}"
+    exit 1
+fi
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"

@@ -14,6 +14,7 @@ pub fn gen_symmetric_key(
     user_pin: &str,
     key_label: &str,
     bits: u32,
+    extractable: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -49,9 +50,11 @@ pub fn gen_symmetric_key(
         Attribute::Label(key_label.as_bytes().to_vec()),
         Attribute::Id(key_label.as_bytes().to_vec()),
         Attribute::Sensitive(true),
-        Attribute::Extractable(false),
+        Attribute::Extractable(extractable),
         Attribute::Encrypt(true),
         Attribute::Decrypt(true),
+        Attribute::Wrap(true),
+        Attribute::Unwrap(true),
         Attribute::ValueLen(((bits / 8) as u64).into()),
     ];
 

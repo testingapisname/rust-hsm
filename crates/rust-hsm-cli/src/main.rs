@@ -192,6 +192,9 @@ enum Commands {
         /// Key size in bits (128, 192, or 256)
         #[arg(long, default_value = "256")]
         bits: u32,
+        /// Allow the key to be wrapped/exported (sets CKA_EXTRACTABLE=true)
+        #[arg(long)]
+        extractable: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
@@ -224,6 +227,69 @@ enum Commands {
         key_label: String,
         #[arg(long)]
         input: String,
+        #[arg(long)]
+        output: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
+    /// Wrap (export) a key using AES Key Wrap
+    WrapKey {
+        #[arg(long)]
+        label: String,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        /// Label of the key to wrap (the key being exported)
+        #[arg(long)]
+        key_label: String,
+        /// Label of the wrapping key (AES KEK - Key Encryption Key)
+        #[arg(long)]
+        wrapping_key_label: String,
+        /// Output file for the wrapped key data
+        #[arg(long)]
+        output: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
+    /// Unwrap (import) a key using AES Key Wrap
+    UnwrapKey {
+        #[arg(long)]
+        label: String,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        /// Label for the imported key
+        #[arg(long)]
+        key_label: String,
+        /// Label of the wrapping key (AES KEK - Key Encryption Key)
+        #[arg(long)]
+        wrapping_key_label: String,
+        /// Input file containing the wrapped key data
+        #[arg(long)]
+        input: String,
+        /// Key type: aes (for symmetric keys)
+        #[arg(long, default_value = "aes")]
+        key_type: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
+    /// Generate a Certificate Signing Request (CSR) for a keypair
+    GenCsr {
+        #[arg(long)]
+        label: String,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        /// Label of the keypair to generate CSR for
+        #[arg(long)]
+        key_label: String,
+        /// Subject Distinguished Name (e.g., "CN=example.com,O=MyOrg,C=US")
+        #[arg(long)]
+        subject: String,
+        /// Output file for the CSR in PEM format
         #[arg(long)]
         output: String,
         /// Read user PIN from stdin instead of command line
@@ -343,13 +409,13 @@ fn main() -> anyhow::Result<()> {
             };
             pkcs11::keys::decrypt(&module_path, &label, &user_pin_value, &key_label, &input, &output)?;
         }
-        Commands::GenSymmetricKey { label, user_pin, key_label, bits, pin_stdin } => {
+        Commands::GenSymmetricKey { label, user_pin, key_label, bits, extractable, pin_stdin } => {
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::gen_symmetric_key(&module_path, &label, &user_pin_value, &key_label, bits)?;
+            pkcs11::keys::gen_symmetric_key(&module_path, &label, &user_pin_value, &key_label, bits, extractable)?;
         }
         Commands::EncryptSymmetric { label, user_pin, key_label, input, output, pin_stdin } => {
             let user_pin_value = if pin_stdin {
@@ -366,6 +432,30 @@ fn main() -> anyhow::Result<()> {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
             pkcs11::keys::decrypt_symmetric(&module_path, &label, &user_pin_value, &key_label, &input, &output)?;
+        }
+        Commands::WrapKey { label, user_pin, key_label, wrapping_key_label, output, pin_stdin } => {
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::keys::wrap_key(&module_path, &label, &user_pin_value, &key_label, &wrapping_key_label, &output)?;
+        }
+        Commands::UnwrapKey { label, user_pin, key_label, wrapping_key_label, input, key_type, pin_stdin } => {
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::keys::unwrap_key(&module_path, &label, &user_pin_value, &key_label, &wrapping_key_label, &input, &key_type)?;
+        }
+        Commands::GenCsr { label, user_pin, key_label, subject, output, pin_stdin } => {
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::keys::generate_csr(&module_path, &label, &user_pin_value, &key_label, &subject, &output)?;
         }
     }
 
