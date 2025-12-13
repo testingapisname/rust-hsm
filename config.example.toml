@@ -1,0 +1,37 @@
+# rust-hsm Configuration File Example
+#
+# This file shows all available configuration options for rust-hsm-cli.
+# Copy this file to one of these locations:
+#   - .rust-hsm.toml (current directory)
+#   - rust-hsm.toml (current directory)
+#   - ~/.config/rust-hsm/config.toml (user config)
+#   - ~/.rust-hsm.toml (user home)
+#   - /app/.rust-hsm.toml (container default)
+#
+# Or specify a custom config file with: --config /path/to/config.toml
+
+# Default token label to use when --label is not specified on the command line.
+# This is useful to avoid typing --label DEV_TOKEN on every command.
+#
+# Example:
+#   default_token_label = "DEV_TOKEN"
+#
+# Without this set, you must always use --label:
+#   rust-hsm-cli gen-keypair --label DEV_TOKEN --user-pin 123456 ...
+#
+# With this set, --label becomes optional:
+#   rust-hsm-cli gen-keypair --user-pin 123456 ...
+#
+default_token_label = "DEV_TOKEN"
+
+# PKCS#11 module path (defaults to SoftHSM2 location if not specified)
+# Change this if using a different HSM or custom SoftHSM installation
+#
+# Common values:
+#   - Linux: /usr/lib/softhsm/libsofthsm2.so
+#   - macOS: /usr/local/lib/softhsm/libsofthsm2.so
+#   - Custom HSM: /path/to/your/pkcs11module.so
+#
+# Note: The PKCS11_MODULE environment variable takes precedence over this setting
+#
+pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"

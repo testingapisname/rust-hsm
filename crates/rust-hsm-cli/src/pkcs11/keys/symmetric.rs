@@ -131,7 +131,7 @@ pub fn encrypt_symmetric(
     trace!("Generated IV: {} bytes", iv.len());
 
     // Encrypt using AES-GCM
-    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], 128u64.into())?);
+    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], (128u64).into())?);
     debug!("Using encryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_EncryptInit, C_Encrypt");
     let ciphertext = session.encrypt(&mechanism, key, &plaintext)?;
@@ -220,7 +220,7 @@ pub fn decrypt_symmetric(
     trace!("Extracted IV: {} bytes, ciphertext: {} bytes", iv.len(), ciphertext.len());
 
     // Decrypt using AES-GCM
-    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], 128u64.into())?);
+    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], (128u64).into())?);
     debug!("Using decryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_DecryptInit, C_Decrypt");
     let plaintext = session.decrypt(&mechanism, key, ciphertext)?;

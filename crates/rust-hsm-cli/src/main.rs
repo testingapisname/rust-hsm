@@ -1,10 +1,14 @@
 use clap::{Parser, Subcommand};
 use std::env;
 use std::io::{self, BufRead};
+use std::path::PathBuf;
 use tracing::info;
 use tracing_subscriber;
 
+mod config;
 mod pkcs11;
+
+use config::Config;
 
 /// Read a PIN from stdin, trimming whitespace
 fn read_pin_from_stdin() -> anyhow::Result<String> {
@@ -18,6 +22,10 @@ fn read_pin_from_stdin() -> anyhow::Result<String> {
 #[command(name = "rust-hsm-cli")]
 #[command(about = "Rust PKCS#11 CLI for SoftHSM2", long_about = None)]
 struct Cli {
+    /// Path to configuration file (optional)
+    #[arg(long, global = true)]
+    config: Option<PathBuf>,
+    
     #[command(subcommand)]
     command: Commands,
 }
@@ -32,8 +40,9 @@ enum Commands {
     
     /// Initialize a token
     InitToken {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         so_pin: Option<String>,
         /// Read SO PIN from stdin instead of command line
@@ -43,8 +52,9 @@ enum Commands {
     
     /// Initialize user PIN on a token
     InitPin {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "so_pin_stdin")]
         so_pin: Option<String>,
         #[arg(long, conflicts_with = "user_pin_stdin")]
@@ -59,8 +69,9 @@ enum Commands {
     
     /// List objects on a token
     ListObjects {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         /// Read user PIN from stdin instead of command line
@@ -70,8 +81,9 @@ enum Commands {
     
     /// Generate a keypair on the token
     GenKeypair {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -87,8 +99,9 @@ enum Commands {
     
     /// Sign data with a private key
     Sign {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -104,8 +117,9 @@ enum Commands {
     
     /// Verify a signature
     Verify {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -121,8 +135,9 @@ enum Commands {
     
     /// Export a public key in PEM format
     ExportPubkey {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -136,8 +151,9 @@ enum Commands {
     
     /// Delete a keypair from the token
     DeleteKey {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -149,8 +165,9 @@ enum Commands {
     
     /// Encrypt data with an RSA public key
     Encrypt {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -166,8 +183,9 @@ enum Commands {
     
     /// Decrypt data with an RSA private key
     Decrypt {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -183,8 +201,9 @@ enum Commands {
     
     /// Generate a symmetric key (AES) on the token
     GenSymmetricKey {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -202,8 +221,9 @@ enum Commands {
     
     /// Encrypt data with AES-GCM
     EncryptSymmetric {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -219,8 +239,9 @@ enum Commands {
     
     /// Decrypt data with AES-GCM
     DecryptSymmetric {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         #[arg(long)]
@@ -236,8 +257,9 @@ enum Commands {
     
     /// Wrap (export) a key using AES Key Wrap
     WrapKey {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         /// Label of the key to wrap (the key being exported)
@@ -256,8 +278,9 @@ enum Commands {
     
     /// Unwrap (import) a key using AES Key Wrap
     UnwrapKey {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         /// Label for the imported key
@@ -279,8 +302,9 @@ enum Commands {
     
     /// Generate a Certificate Signing Request (CSR) for a keypair
     GenCsr {
+        /// Token label (uses config default if not specified)
         #[arg(long)]
-        label: String,
+        label: Option<String>,
         #[arg(long, conflicts_with = "pin_stdin")]
         user_pin: Option<String>,
         /// Label of the keypair to generate CSR for
@@ -309,9 +333,12 @@ fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
-    // Get PKCS#11 module path from environment
+    // Load configuration (CLI --config flag takes precedence over default locations)
+    let config = Config::load_with_custom_path(cli.config);
+
+    // Get PKCS#11 module path from environment, or config, or default
     let module_path = env::var("PKCS11_MODULE")
-        .unwrap_or_else(|_| "/usr/lib/softhsm/libsofthsm2.so".to_string());
+        .unwrap_or_else(|_| config.get_pkcs11_module().to_string());
 
     info!("Using PKCS#11 module: {}", module_path);
 
@@ -323,14 +350,18 @@ fn main() -> anyhow::Result<()> {
             pkcs11::slots::list_slots(&module_path)?;
         }
         Commands::InitToken { label, so_pin, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let so_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 so_pin.ok_or_else(|| anyhow::anyhow!("Either --so-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::token::init_token(&module_path, &label, &so_pin_value)?;
+            pkcs11::token::init_token(&module_path, &token_label, &so_pin_value)?;
         }
         Commands::InitPin { label, so_pin, user_pin, so_pin_stdin, user_pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let so_pin_value = if so_pin_stdin {
                 read_pin_from_stdin()?
             } else {
@@ -343,119 +374,147 @@ fn main() -> anyhow::Result<()> {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --user-pin-stdin must be provided"))?
             };
             
-            pkcs11::token::init_pin(&module_path, &label, &so_pin_value, &user_pin_value)?;
+            pkcs11::token::init_pin(&module_path, &token_label, &so_pin_value, &user_pin_value)?;
         }
         Commands::ListObjects { label, user_pin, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::objects::list_objects(&module_path, &label, &user_pin_value)?;
+            pkcs11::objects::list_objects(&module_path, &token_label, &user_pin_value)?;
         }
         Commands::GenKeypair { label, user_pin, key_label, key_type, bits, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::gen_keypair(&module_path, &label, &user_pin_value, &key_label, &key_type, bits)?;
+            pkcs11::keys::gen_keypair(&module_path, &token_label, &user_pin_value, &key_label, &key_type, bits)?;
         }
         Commands::Sign { label, user_pin, key_label, input, output, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::sign(&module_path, &label, &user_pin_value, &key_label, &input, &output)?;
+            pkcs11::keys::sign(&module_path, &token_label, &user_pin_value, &key_label, &input, &output)?;
         }
         Commands::Verify { label, user_pin, key_label, input, signature, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::verify(&module_path, &label, &user_pin_value, &key_label, &input, &signature)?;
+            pkcs11::keys::verify(&module_path, &token_label, &user_pin_value, &key_label, &input, &signature)?;
         }
         Commands::ExportPubkey { label, user_pin, key_label, output, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::export_pubkey(&module_path, &label, &user_pin_value, &key_label, &output)?;
+            pkcs11::keys::export_pubkey(&module_path, &token_label, &user_pin_value, &key_label, &output)?;
         }
         Commands::DeleteKey { label, user_pin, key_label, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::delete_key(&module_path, &label, &user_pin_value, &key_label)?;
+            pkcs11::keys::delete_key(&module_path, &token_label, &user_pin_value, &key_label)?;
         }
         Commands::Encrypt { label, user_pin, key_label, input, output, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::encrypt(&module_path, &label, &user_pin_value, &key_label, &input, &output)?;
+            pkcs11::keys::encrypt(&module_path, &token_label, &user_pin_value, &key_label, &input, &output)?;
         }
         Commands::Decrypt { label, user_pin, key_label, input, output, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::decrypt(&module_path, &label, &user_pin_value, &key_label, &input, &output)?;
+            pkcs11::keys::decrypt(&module_path, &token_label, &user_pin_value, &key_label, &input, &output)?;
         }
         Commands::GenSymmetricKey { label, user_pin, key_label, bits, extractable, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::gen_symmetric_key(&module_path, &label, &user_pin_value, &key_label, bits, extractable)?;
+            pkcs11::keys::gen_symmetric_key(&module_path, &token_label, &user_pin_value, &key_label, bits, extractable)?;
         }
         Commands::EncryptSymmetric { label, user_pin, key_label, input, output, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::encrypt_symmetric(&module_path, &label, &user_pin_value, &key_label, &input, &output)?;
+            pkcs11::keys::encrypt_symmetric(&module_path, &token_label, &user_pin_value, &key_label, &input, &output)?;
         }
         Commands::DecryptSymmetric { label, user_pin, key_label, input, output, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::decrypt_symmetric(&module_path, &label, &user_pin_value, &key_label, &input, &output)?;
+            pkcs11::keys::decrypt_symmetric(&module_path, &token_label, &user_pin_value, &key_label, &input, &output)?;
         }
         Commands::WrapKey { label, user_pin, key_label, wrapping_key_label, output, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::wrap_key(&module_path, &label, &user_pin_value, &key_label, &wrapping_key_label, &output)?;
+            pkcs11::keys::wrap_key(&module_path, &token_label, &user_pin_value, &key_label, &wrapping_key_label, &output)?;
         }
         Commands::UnwrapKey { label, user_pin, key_label, wrapping_key_label, input, key_type, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::unwrap_key(&module_path, &label, &user_pin_value, &key_label, &wrapping_key_label, &input, &key_type)?;
+            pkcs11::keys::unwrap_key(&module_path, &token_label, &user_pin_value, &key_label, &wrapping_key_label, &input, &key_type)?;
         }
         Commands::GenCsr { label, user_pin, key_label, subject, output, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
             let user_pin_value = if pin_stdin {
                 read_pin_from_stdin()?
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
             };
-            pkcs11::keys::generate_csr(&module_path, &label, &user_pin_value, &key_label, &subject, &output)?;
+            pkcs11::keys::generate_csr(&module_path, &token_label, &user_pin_value, &key_label, &subject, &output)?;
         }
     }
 

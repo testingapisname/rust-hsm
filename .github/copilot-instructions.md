@@ -63,6 +63,17 @@ crates/rust-hsm-cli/src/
 
 ## Development Workflow
 
+### Configuration File (New!)
+Create `/ app/.rust-hsm.toml` or `.rust-hsm.toml` to avoid repeating `--label`:
+```toml
+default_token_label = "DEV_TOKEN"
+pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"
+```
+- CLI args override config values
+- Config module: [src/config.rs](../crates/rust-hsm-cli/src/config.rs)
+- Loaded in [main.rs](../crates/rust-hsm-cli/src/main.rs#L336-L341)
+- Example: [config.example.toml](../config.example.toml)
+
 ### Build & Run
 ```bash
 docker compose up -d --build          # Rebuild after code changes
