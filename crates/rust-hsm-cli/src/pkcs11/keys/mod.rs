@@ -8,6 +8,7 @@ mod wrap;
 mod csr;
 mod hash;
 mod hmac;
+mod cmac;
 
 pub use keypair::gen_keypair;
 pub use asymmetric::{sign, verify, encrypt, decrypt};
@@ -18,3 +19,4 @@ pub use csr::generate_csr;
 pub use utils::delete_key;
 pub use hash::hash_data;
 pub use hmac::{gen_hmac_key, hmac_sign, hmac_verify};
+pub use cmac::{gen_cmac_key, cmac_sign, cmac_verify};

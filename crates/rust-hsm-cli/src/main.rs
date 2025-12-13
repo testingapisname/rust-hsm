@@ -415,6 +415,66 @@ enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
+    
+    /// Generate an AES-CMAC key
+    GenCmacKey {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        /// AES key size in bits (128, 192, or 256)
+        #[arg(long, default_value = "256")]
+        bits: u32,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
+    /// Compute CMAC for data (AES-based message authentication)
+    CmacSign {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        /// Input file to authenticate
+        #[arg(long)]
+        input: String,
+        /// Output file for the CMAC
+        #[arg(long)]
+        output: String,
+        /// MAC length in bytes (default: 16 for full AES block)
+        #[arg(long)]
+        mac_len: Option<usize>,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
+    /// Verify CMAC for data
+    CmacVerify {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        /// Input file to verify
+        #[arg(long)]
+        input: String,
+        /// CMAC file to verify against
+        #[arg(long)]
+        cmac: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -662,6 +722,40 @@ fn main() -> anyhow::Result<()> {
             let input_path = PathBuf::from(&input);
             let hmac_path = PathBuf::from(&hmac);
             pkcs11::keys::hmac_verify(&module_path, &token_label, &user_pin_value, &key_label, &algorithm, &input_path, &hmac_path)?;
+        }
+        Commands::GenCmacKey { label, user_pin, key_label, bits, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::keys::gen_cmac_key(&module_path, &token_label, &user_pin_value, &key_label, bits)?;
+        }
+        Commands::CmacSign { label, user_pin, key_label, input, output, mac_len, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            let input_path = PathBuf::from(&input);
+            let output_path = PathBuf::from(&output);
+            pkcs11::keys::cmac_sign(&module_path, &token_label, &user_pin_value, &key_label, &input_path, &output_path, mac_len)?;
+        }
+        Commands::CmacVerify { label, user_pin, key_label, input, cmac, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            let input_path = PathBuf::from(&input);
+            let cmac_path = PathBuf::from(&cmac);
+            pkcs11::keys::cmac_verify(&module_path, &token_label, &user_pin_value, &key_label, &input_path, &cmac_path)?;
         }
     }
 

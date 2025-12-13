@@ -289,13 +289,37 @@ fi
 echo -e "\n${GREEN}[29/30] Testing HMAC verification (valid)${NC}"
 $CLI hmac-verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-hmac-key --algorithm sha256 --input /app/test-hmac-data.txt --hmac /app/test-hmac.mac && echo "✓ HMAC verification successful" || exit 1
 
-echo -e "\n${GREEN}[30/30] Testing HMAC verification failure (tampered data)${NC}"
+echo -e "\n${GREEN}[30/33] Testing HMAC verification failure (tampered data)${NC}"
 echo "TAMPERED data" > /app/test-hmac-data.txt
 if $CLI hmac-verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-hmac-key --algorithm sha256 --input /app/test-hmac-data.txt --hmac /app/test-hmac.mac 2>/dev/null; then
     echo -e "${RED}✗ HMAC verification should have failed for tampered data${NC}"
     exit 1
 else
     echo "✓ HMAC verification correctly rejected tampered data"
+fi
+
+echo -e "\n${GREEN}[31/33] Testing AES-CMAC key generation and signing${NC}"
+echo "test data for CMAC" > /app/test-cmac-data.txt
+$CLI gen-cmac-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-cmac-key --bits 256 && echo "✓ CMAC-256 key generated" || exit 1
+$CLI cmac-sign --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-cmac-key --input /app/test-cmac-data.txt --output /app/test-cmac.mac && echo "✓ CMAC computed" || exit 1
+# Verify CMAC file exists and has correct size (16 bytes for AES CMAC)
+if [ -f /app/test-cmac.mac ] && [ $(wc -c < /app/test-cmac.mac) -eq 16 ]; then
+    echo "✓ CMAC size correct (16 bytes)"
+else
+    echo -e "${RED}✗ CMAC size incorrect${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[32/33] Testing CMAC verification (valid)${NC}"
+$CLI cmac-verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-cmac-key --input /app/test-cmac-data.txt --cmac /app/test-cmac.mac && echo "✓ CMAC verification successful" || exit 1
+
+echo -e "\n${GREEN}[33/33] Testing CMAC verification failure (tampered data)${NC}"
+echo "TAMPERED data" > /app/test-cmac-data.txt
+if $CLI cmac-verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-cmac-key --input /app/test-cmac-data.txt --cmac /app/test-cmac.mac 2>/dev/null; then
+    echo -e "${RED}✗ CMAC verification should have failed for tampered data${NC}"
+    exit 1
+else
+    echo "✓ CMAC verification correctly rejected tampered data"
 fi
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
