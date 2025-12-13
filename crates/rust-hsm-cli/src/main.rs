@@ -74,6 +74,18 @@ enum Commands {
         user_pin_stdin: bool,
     },
     
+    /// Delete a token (reinitializes the slot, erasing all data)
+    DeleteToken {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        so_pin: Option<String>,
+        /// Read SO PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
     /// List objects on a token
     ListObjects {
         /// Token label (uses config default if not specified)
@@ -340,6 +352,69 @@ enum Commands {
         #[arg(long)]
         output: String,
     },
+    
+    /// Generate an HMAC key
+    GenHmacKey {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        /// Key size in bits (typically 256)
+        #[arg(long, default_value = "256")]
+        bits: u32,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
+    /// Compute HMAC for data (message authentication)
+    HmacSign {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        /// HMAC algorithm (sha256, sha512, sha384, sha224, sha1)
+        #[arg(long, default_value = "sha256")]
+        algorithm: String,
+        /// Input file to authenticate
+        #[arg(long)]
+        input: String,
+        /// Output file for the HMAC
+        #[arg(long)]
+        output: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+    
+    /// Verify HMAC for data
+    HmacVerify {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        #[arg(long)]
+        key_label: String,
+        /// HMAC algorithm (sha256, sha512, sha384, sha224, sha1)
+        #[arg(long, default_value = "sha256")]
+        algorithm: String,
+        /// Input file to verify
+        #[arg(long)]
+        input: String,
+        /// HMAC file to verify against
+        #[arg(long)]
+        hmac: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -398,6 +473,16 @@ fn main() -> anyhow::Result<()> {
             };
             
             pkcs11::token::init_pin(&module_path, &token_label, &so_pin_value, &user_pin_value)?;
+        }
+        Commands::DeleteToken { label, so_pin, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
+            let so_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                so_pin.ok_or_else(|| anyhow::anyhow!("Either --so-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::token::delete_token(&module_path, &token_label, &so_pin_value)?;
         }
         Commands::ListObjects { label, user_pin, pin_stdin } => {
             let token_label = config.token_label(label.as_deref())
@@ -543,6 +628,40 @@ fn main() -> anyhow::Result<()> {
             let input_path = PathBuf::from(&input);
             let output_path = PathBuf::from(&output);
             pkcs11::keys::hash_data(&module_path, &algorithm, &input_path, &output_path)?;
+        }
+        Commands::GenHmacKey { label, user_pin, key_label, bits, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            pkcs11::keys::gen_hmac_key(&module_path, &token_label, &user_pin_value, &key_label, bits)?;
+        }
+        Commands::HmacSign { label, user_pin, key_label, algorithm, input, output, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            let input_path = PathBuf::from(&input);
+            let output_path = PathBuf::from(&output);
+            pkcs11::keys::hmac_sign(&module_path, &token_label, &user_pin_value, &key_label, &algorithm, &input_path, &output_path)?;
+        }
+        Commands::HmacVerify { label, user_pin, key_label, algorithm, input, hmac, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label must be specified with --label or in config file"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("Either --user-pin or --pin-stdin must be provided"))?
+            };
+            let input_path = PathBuf::from(&input);
+            let hmac_path = PathBuf::from(&hmac);
+            pkcs11::keys::hmac_verify(&module_path, &token_label, &user_pin_value, &key_label, &algorithm, &input_path, &hmac_path)?;
         }
     }
 

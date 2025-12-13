@@ -103,3 +103,54 @@ fn find_token_slot(pkcs11: &Pkcs11, label: &str) -> anyhow::Result<cryptoki::slo
     
     anyhow::bail!("Token '{}' not found", label)
 }
+
+pub fn delete_token(module_path: &str, label: &str, so_pin: &str) -> anyhow::Result<()> {
+    // Try SoftHSM-specific deletion first (actually removes token files)
+    debug!("Attempting SoftHSM-specific token deletion with softhsm2-util");
+    if let Ok(output) = std::process::Command::new("softhsm2-util")
+        .args(&["--delete-token", "--token", label])
+        .output()
+    {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains("deleted") {
+                info!("Token '{}' deleted successfully using softhsm2-util", label);
+                println!("Token '{}' deleted successfully", label);
+                return Ok(());
+            }
+        }
+        debug!("softhsm2-util deletion failed or token not found, falling back to PKCS#11");
+    } else {
+        debug!("softhsm2-util not available, using PKCS#11 method");
+    }
+
+    // Fallback: Use PKCS#11 to reinitialize the slot (works with any HSM)
+    debug!("Loading PKCS#11 module from: {}", module_path);
+    let pkcs11 = Pkcs11::new(module_path)?;
+    debug!("Initializing PKCS#11 library");
+    pkcs11.initialize(CInitializeArgs::OsThreads)?;
+
+    // Find slot with matching token label
+    debug!("Finding token slot for label: {}", label);
+    let slot = find_token_slot(&pkcs11, label)?;
+    debug!("Token found at slot: {}", usize::from(slot));
+    
+    info!("Deleting token '{}' from slot {} using PKCS#11", label, usize::from(slot));
+
+    // Re-initialize the token with an empty label to effectively delete it
+    // Note: PKCS#11 doesn't have a direct "delete token" operation,
+    // so we reinitialize the token which erases all data
+    let so_pin_auth = AuthPin::new(so_pin.to_string());
+    debug!("Calling PKCS#11 init_token to reset slot");
+    debug!("→ Calling C_InitToken");
+    pkcs11.init_token(slot, &so_pin_auth, "")?;
+    debug!("Token reinitialized successfully");
+    
+    println!("Token '{}' deleted successfully from slot {}", label, usize::from(slot));
+
+    debug!("Finalizing PKCS#11 library");
+    debug!("→ Calling C_Finalize");
+    pkcs11.finalize();
+    
+    Ok(())
+}

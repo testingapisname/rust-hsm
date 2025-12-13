@@ -22,7 +22,7 @@
 # With this set, --label becomes optional:
 #   rust-hsm-cli gen-keypair --user-pin 123456 ...
 #
-default_token_label = "DEV_TOKEN"
+default_token_label = "test-token"
 
 # PKCS#11 module path (defaults to SoftHSM2 location if not specified)
 # Change this if using a different HSM or custom SoftHSM installation

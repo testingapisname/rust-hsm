@@ -8,7 +8,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Use timestamp for unique token name
+# Use unique token name to avoid conflicts
 TEST_TOKEN="TEST_TOKEN_$(date +%s)"
 SO_PIN="test-so-1234"
 USER_PIN="test-user-123456"
@@ -23,18 +23,11 @@ cleanup() {
     echo "Cleaning up test artifacts..."
     
     # Remove test files
-    rm -f /app/test-*.txt /app/test-*.sig /app/test-*.enc /app/test-*.bin /app/test-*.pem /app/test.csr /app/test-wrapped.bin 2>/dev/null
+    rm -f /app/test-*.txt /app/test-*.sig /app/test-*.enc /app/test-*.bin /app/test-*.pem /app/test.csr /app/test-wrapped.bin /app/test-*.mac /app/test-*.sha256 /app/test-*.sha512 2>/dev/null
     
-    # Delete ALL test tokens matching TEST_TOKEN_* pattern from SoftHSM
-    TOKENS_DELETED=0
-    for token in $(softhsm2-util --show-slots 2>/dev/null | grep "Label:" | grep "TEST_TOKEN_" | sed 's/.*Label: *//'); do
-        if softhsm2-util --delete-token --token "$token" 2>&1 | grep -q "deleted"; then
-            echo "✓ Removed test token: $token"
-            ((TOKENS_DELETED++))
-        fi
-    done
-    if [ $TOKENS_DELETED -gt 0 ]; then
-        echo "✓ Cleaned up $TOKENS_DELETED test token(s) from SoftHSM"
+    # Delete test token using rust-hsm-cli (works with any HSM, not just SoftHSM)
+    if $CLI delete-token --label "$TEST_TOKEN" --so-pin "$SO_PIN" 2>&1 | grep -q "deleted"; then
+        echo "✓ Removed test token: $TEST_TOKEN"
     fi
 }
 
@@ -50,10 +43,10 @@ fi
 CLI="$EXEC_PREFIX rust-hsm-cli"
 
 echo -e "\n${GREEN}[1/11] Testing info command${NC}"
-$CLI info | grep -q "SoftHSM" && echo "✓ Info command works" || exit 1
+$CLI info 2>/dev/null | grep -q "SoftHSM" && echo "✓ Info command works" || exit 1
 
 echo -e "\n${GREEN}[2/11] Testing list-slots command${NC}"
-$CLI list-slots | grep -q "Slot" && echo "✓ List-slots command works" || exit 1
+$CLI list-slots 2>/dev/null | grep -q "Slot" && echo "✓ List-slots command works" || exit 1
 
 echo -e "\n${GREEN}[3/11] Testing list-mechanisms command${NC}"
 $CLI list-mechanisms | grep -q "Total mechanisms supported: 40" && echo "✓ List-mechanisms command works" || exit 1
@@ -279,6 +272,30 @@ if [ "$SYSTEM_HASH" = "$HSM_HASH" ]; then
 else
     echo -e "${RED}✗ SHA-512 hash doesn't match system sha512sum${NC}"
     exit 1
+fi
+
+echo -e "\n${GREEN}[28/30] Testing HMAC-SHA256 key generation and signing${NC}"
+echo "test data for HMAC" > /app/test-hmac-data.txt
+$CLI gen-hmac-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-hmac-key --bits 256 && echo "✓ HMAC-256 key generated" || exit 1
+$CLI hmac-sign --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-hmac-key --algorithm sha256 --input /app/test-hmac-data.txt --output /app/test-hmac.mac && echo "✓ HMAC computed" || exit 1
+# Verify HMAC file exists and has correct size (32 bytes for SHA-256 HMAC)
+if [ -f /app/test-hmac.mac ] && [ $(wc -c < /app/test-hmac.mac) -eq 32 ]; then
+    echo "✓ HMAC size correct (32 bytes)"
+else
+    echo -e "${RED}✗ HMAC size incorrect${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}[29/30] Testing HMAC verification (valid)${NC}"
+$CLI hmac-verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-hmac-key --algorithm sha256 --input /app/test-hmac-data.txt --hmac /app/test-hmac.mac && echo "✓ HMAC verification successful" || exit 1
+
+echo -e "\n${GREEN}[30/30] Testing HMAC verification failure (tampered data)${NC}"
+echo "TAMPERED data" > /app/test-hmac-data.txt
+if $CLI hmac-verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label test-hmac-key --algorithm sha256 --input /app/test-hmac-data.txt --hmac /app/test-hmac.mac 2>/dev/null; then
+    echo -e "${RED}✗ HMAC verification should have failed for tampered data${NC}"
+    exit 1
+else
+    echo "✓ HMAC verification correctly rejected tampered data"
 fi
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
