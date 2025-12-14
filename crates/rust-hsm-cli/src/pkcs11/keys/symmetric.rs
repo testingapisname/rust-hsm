@@ -64,7 +64,7 @@ pub fn gen_symmetric_key(
         Attribute::Decrypt(true),
         Attribute::Wrap(true),
         Attribute::Unwrap(true),
-        Attribute::ValueLen(((bits / 8) as u64).into()),
+        Attribute::ValueLen(cryptoki::types::Ulong::from((bits / 8) as u32)),
     ];
 
     let key = session.generate_key(&mechanism, &key_template)?;
@@ -145,7 +145,7 @@ pub fn encrypt_symmetric(
     let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(
         &mut iv,
         &[],
-        (128u64).into(),
+        cryptoki::types::Ulong::from(128u32),
     )?);
     debug!("Using encryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_EncryptInit, C_Encrypt");
@@ -253,7 +253,7 @@ pub fn decrypt_symmetric(
     let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(
         &mut iv,
         &[],
-        (128u64).into(),
+        cryptoki::types::Ulong::from(128u32),
     )?);
     debug!("Using decryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_DecryptInit, C_Decrypt");

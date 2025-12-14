@@ -8,7 +8,7 @@ use tracing::{debug, info};
 
 use super::utils::find_token_slot;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 
 /// Display detailed attributes for a key
@@ -132,7 +132,7 @@ fn calculate_fingerprint(
     }
 
     // Get key type
-    let key_type = if let Ok(attrs) = session.get_attributes(handle, &[AttributeType::KeyType]) {
+    let _key_type = if let Ok(attrs) = session.get_attributes(handle, &[AttributeType::KeyType]) {
         attrs.first().cloned()
     } else {
         return None;
@@ -271,7 +271,7 @@ fn print_attribute(attr: &Attribute, attr_type: AttributeType) {
             println!("  CKA_NEVER_EXTRACTABLE:  {}", b);
         }
         Attribute::ValueLen(len) => {
-            println!("  CKA_VALUE_LEN:          {} bytes", u64::from(*len));
+            println!("  CKA_VALUE_LEN:          {} bytes", usize::from(*len));
         }
         Attribute::Modulus(m) => {
             println!(
@@ -404,7 +404,7 @@ fn attribute_to_json(attr: &Attribute) -> (String, Option<serde_json::Value>) {
         Attribute::Local(b) => ("CKA_LOCAL".to_string(), Some(json!(b))),
         Attribute::AlwaysSensitive(b) => ("CKA_ALWAYS_SENSITIVE".to_string(), Some(json!(b))),
         Attribute::NeverExtractable(b) => ("CKA_NEVER_EXTRACTABLE".to_string(), Some(json!(b))),
-        Attribute::ValueLen(len) => ("CKA_VALUE_LEN".to_string(), Some(json!(u64::from(*len)))),
+        Attribute::ValueLen(len) => ("CKA_VALUE_LEN".to_string(), Some(json!(usize::from(*len)))),
         Attribute::Modulus(m) => (
             "CKA_MODULUS".to_string(),
             Some(json!({"bits": m.len() * 8, "bytes": m.len()})),

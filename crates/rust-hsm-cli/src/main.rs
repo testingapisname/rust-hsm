@@ -1,9 +1,23 @@
+#![allow(clippy::print_literal)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::needless_borrows_for_generic_args)]
+#![allow(clippy::empty_line_after_doc_comments)]
+#![allow(clippy::unwrap_or_default)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::match_ref_pats)]
+#![allow(clippy::to_string_in_format_args)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::collapsible_else_if)]
+#![allow(clippy::unnecessary_cast)]
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 use clap::Parser;
 use std::env;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
 use tracing::info;
-use tracing_subscriber;
+use tracing_subscriber::EnvFilter;
 
 mod cli;
 mod config;

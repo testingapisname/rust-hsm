@@ -1,12 +1,9 @@
 use anyhow::{Context, Result};
 use cryptoki::context::Pkcs11;
 use cryptoki::mechanism::Mechanism;
-use cryptoki::session::Session;
 use std::fs;
 use std::path::PathBuf;
 use tracing::info;
-
-use super::utils::find_token_slot;
 
 /// Hash data using SHA-256 or SHA-512
 pub fn hash_data(

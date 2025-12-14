@@ -3,7 +3,7 @@ use cryptoki::context::Pkcs11;
 use cryptoki::mechanism::Mechanism;
 use cryptoki::object::{Attribute, ObjectClass};
 use cryptoki::session::UserType;
-use cryptoki::types::{AuthPin, Ulong};
+use cryptoki::types::AuthPin;
 use std::fs;
 use std::path::PathBuf;
 use tracing::info;
@@ -49,7 +49,7 @@ pub fn gen_hmac_key(
         Attribute::Sign(true),
         Attribute::Verify(true),
         Attribute::Label(key_label.as_bytes().to_vec()),
-        Attribute::ValueLen(Ulong::from((bits / 8) as u64)),
+        Attribute::ValueLen(cryptoki::types::Ulong::from((bits / 8) as u32)),
     ];
 
     let key_handle = session

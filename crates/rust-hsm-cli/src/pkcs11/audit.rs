@@ -68,7 +68,7 @@ fn audit_keys_internal(
     module_path: &str,
     token_label: &str,
     user_pin: &str,
-    verbose: bool,
+    _verbose: bool,
     json_output: bool,
 ) -> Result<()> {
     let pkcs11 = Pkcs11::new(module_path)
@@ -119,7 +119,7 @@ fn audit_keys_internal(
             let mut obj_class = None;
             let mut key_type_attr = None;
             let mut label = String::from("(unlabeled)");
-            let mut is_private = false;
+            let mut _is_private = false;
             let mut is_sensitive = false;
             let mut is_extractable = false;
             let mut is_modifiable = false;
@@ -138,7 +138,7 @@ fn audit_keys_internal(
                             label = s;
                         }
                     }
-                    Attribute::Private(b) => is_private = *b,
+                    Attribute::Private(b) => _is_private = *b,
                     Attribute::Sensitive(b) => is_sensitive = *b,
                     Attribute::Extractable(b) => is_extractable = *b,
                     Attribute::Modifiable(b) => is_modifiable = *b,
@@ -417,7 +417,7 @@ fn determine_key_type(
         match kt {
             KeyType::RSA => {
                 if let Some(bits) = modulus_bits {
-                    format!("RSA-{}", u64::from(bits))
+                    format!("RSA-{}", *bits as u64)
                 } else {
                     "RSA".to_string()
                 }
@@ -437,7 +437,7 @@ fn determine_key_type(
             }
             KeyType::AES => {
                 if let Some(len) = value_len {
-                    format!("AES-{}", u64::from(len) * 8)
+                    format!("AES-{}", (*len as u64) * 8)
                 } else {
                     "AES".to_string()
                 }

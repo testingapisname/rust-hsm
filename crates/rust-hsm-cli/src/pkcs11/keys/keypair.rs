@@ -54,7 +54,7 @@ pub fn gen_keypair(
                 Attribute::Id(key_label.as_bytes().to_vec()),
                 Attribute::Encrypt(true),
                 Attribute::Verify(true),
-                Attribute::ModulusBits(cryptoki::types::Ulong::from(bits as u64)),
+                Attribute::ModulusBits(cryptoki::types::Ulong::from(bits)),
                 Attribute::PublicExponent(vec![0x01, 0x00, 0x01]), // 65537
             ];
 
