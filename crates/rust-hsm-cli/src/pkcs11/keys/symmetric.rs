@@ -64,7 +64,7 @@ pub fn gen_symmetric_key(
         Attribute::Decrypt(true),
         Attribute::Wrap(true),
         Attribute::Unwrap(true),
-        Attribute::ValueLen(cryptoki::types::Ulong::from(bits / 8)),
+        Attribute::ValueLen(cryptoki::types::Ulong::from((bits / 8) as u64)),
     ];
 
     let key = session.generate_key(&mechanism, &key_template)?;

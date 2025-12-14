@@ -54,7 +54,7 @@ pub fn gen_cmac_key(
         Attribute::Sign(true),
         Attribute::Verify(true),
         Attribute::Label(key_label.as_bytes().to_vec()),
-        Attribute::ValueLen(cryptoki::types::Ulong::from(bits / 8)),
+        Attribute::ValueLen(cryptoki::types::Ulong::from((bits / 8) as u64)),
     ];
 
     let mechanism = Mechanism::AesKeyGen;
