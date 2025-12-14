@@ -67,9 +67,9 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
-          languages: 'cpp'  # Rust is analyzed as C++
+          languages: 'rust'
       
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -78,4 +78,4 @@ jobs:
         run: cd crates/rust-hsm-cli && cargo build --release
       
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
