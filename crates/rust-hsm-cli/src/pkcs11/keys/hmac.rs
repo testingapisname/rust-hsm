@@ -49,7 +49,7 @@ pub fn gen_hmac_key(
         Attribute::Sign(true),
         Attribute::Verify(true),
         Attribute::Label(key_label.as_bytes().to_vec()),
-        Attribute::ValueLen(cryptoki::types::Ulong::from((bits / 8) as u32)),
+        Attribute::ValueLen(cryptoki::types::Ulong::from(bits / 8)),
     ];
 
     let key_handle = session
