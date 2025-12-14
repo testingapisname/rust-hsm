@@ -301,7 +301,7 @@ fn main() -> anyhow::Result<()> {
         Commands::GenRandom { bytes, output, hex } => {
             pkcs11::random::generate_random(&module_path, bytes, output.as_ref(), hex)?;
         }
-        Commands::Benchmark { label, user_pin, key_label, iterations, format, warmup, output, pin_stdin } => {
+        Commands::Benchmark { label, user_pin, key_label, iterations, format, warmup, output, compare, data_sizes, pin_stdin } => {
             let token_label = config.token_label(label.as_deref())
                 .ok_or_else(|| anyhow::anyhow!("Token label required"))?;
             let user_pin_value = if pin_stdin {
@@ -318,6 +318,8 @@ fn main() -> anyhow::Result<()> {
                 &format,
                 warmup,
                 output.as_deref(),
+                compare.as_deref(),
+                data_sizes,
             )?;
         }
         Commands::AuditKeys { label, user_pin, json, pin_stdin } => {

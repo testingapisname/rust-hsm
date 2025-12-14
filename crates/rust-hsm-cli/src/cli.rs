@@ -520,6 +520,12 @@ pub enum Commands {
         /// Output file for JSON/CSV results (stdout if not specified)
         #[arg(long)]
         output: Option<String>,
+        /// Compare with previous benchmark results (JSON file)
+        #[arg(long)]
+        compare: Option<String>,
+        /// Test with multiple data sizes (1KB,10KB,100KB,1MB) for encryption/hash ops
+        #[arg(long)]
+        data_sizes: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,

@@ -19,11 +19,11 @@ use super::keys::find_token_slot;
 struct BenchmarkResult {
     name: String,
     iterations: usize,
-    #[serde(serialize_with = "serialize_duration_ms")]
+    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
     total_duration: Duration,
-    #[serde(serialize_with = "serialize_duration_ms")]
+    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
     min: Duration,
-    #[serde(serialize_with = "serialize_duration_ms")]
+    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
     max: Duration,
     percentiles: Percentiles,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -37,23 +37,31 @@ where
     serializer.serialize_f64(duration.as_secs_f64() * 1000.0)
 }
 
+fn deserialize_duration_ms<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let ms = f64::deserialize(deserializer)?;
+    Ok(Duration::from_secs_f64(ms / 1000.0))
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct Percentiles {
-    #[serde(serialize_with = "serialize_duration_ms")]
+    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
     p50: Duration,
-    #[serde(serialize_with = "serialize_duration_ms")]
+    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
     p95: Duration,
-    #[serde(serialize_with = "serialize_duration_ms")]
+    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
     p99: Duration,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct BenchmarkReport {
     metadata: BenchmarkMetadata,
     results: Vec<BenchmarkResultWithMetrics>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct BenchmarkMetadata {
     timestamp: DateTime<Utc>,
     token_label: String,
@@ -62,7 +70,7 @@ struct BenchmarkMetadata {
     system_info: SystemInfo,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct SystemInfo {
     os: String,
     os_version: String,
@@ -70,7 +78,7 @@ struct SystemInfo {
     total_memory_mb: u64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct BenchmarkResultWithMetrics {
     #[serde(flatten)]
     result: BenchmarkResult,
@@ -148,8 +156,17 @@ pub fn run_full_benchmark(
     format: &str,
     warmup: usize,
     output_file: Option<&str>,
+    compare_file: Option<&str>,
+    data_sizes: bool,
 ) -> Result<()> {
     let show_progress = format == "text" && output_file.is_none();
+    
+    // Load comparison baseline if provided
+    let baseline = if let Some(path) = compare_file {
+        Some(load_baseline(path)?)
+    } else {
+        None
+    };
     
     if show_progress {
         println!("\n{}", "=".repeat(80));
@@ -164,6 +181,12 @@ pub fn run_full_benchmark(
         println!("Iterations per test: {}", iterations);
         if warmup > 0 {
             println!("Warmup iterations: {}", warmup);
+        }
+        if data_sizes {
+            println!("Data sizes: 1KB, 10KB, 100KB, 1MB");
+        }
+        if baseline.is_some() {
+            println!("Comparison mode: Enabled");
         }
         println!("Output format: {}", format);
         println!("{}\n", "=".repeat(80));
@@ -234,13 +257,31 @@ pub fn run_full_benchmark(
             println!("\n🎲 RANDOM GENERATION\n");
         }
         results.push(bench_random(&session, iterations, warmup, show_progress)?);
+        
+        // Data size variation tests (if enabled)
+        if data_sizes {
+            if show_progress {
+                println!("\n📊 DATA SIZE VARIATION\n");
+            }
+            let sizes = vec![(1024, "1KB"), (10240, "10KB"), (102400, "100KB"), (1048576, "1MB")];
+            for (size, label) in sizes {
+                results.push(bench_aes_encrypt_size(&session, "bench-aes-256", size, label, iterations, warmup, show_progress)?);
+                results.push(bench_hash_size(&session, "SHA-256", Mechanism::Sha256, size, label, iterations, warmup, show_progress)?);
+            }
+        }
     }
 
     // Output results based on format
     match format {
         "json" => output_json(&results, token_label, iterations, warmup, output_file)?,
         "csv" => output_csv(&results, output_file)?,
-        _ => print_summary_table(&results),
+        _ => {
+            if let Some(ref baseline_data) = baseline {
+                print_comparison_table(&results, baseline_data);
+            } else {
+                print_summary_table(&results);
+            }
+        }
     }
 
     Ok(())
@@ -901,4 +942,114 @@ fn print_summary_table(results: &[BenchmarkResult]) {
     }
     
     println!("{}", "=".repeat(80));
+}
+fn load_baseline(path: &str) -> Result<BenchmarkReport> {
+    let file = File::open(path)
+        .with_context(|| format!("Failed to open baseline file: {}", path))?;
+    let report: BenchmarkReport = serde_json::from_reader(file)
+        .with_context(|| format!("Failed to parse baseline JSON: {}", path))?;
+    Ok(report)
+}
+
+fn print_comparison_table(results: &[BenchmarkResult], baseline: &BenchmarkReport) {
+    println!("\n{}", "=".repeat(100));
+    println!("BENCHMARK COMPARISON (Current vs Baseline)");
+    println!("{}", "=".repeat(100));
+    println!("Baseline: {} | {}", baseline.metadata.timestamp, baseline.metadata.token_label);
+    println!("{}", "=".repeat(100));
+    println!("{:<30} {:>10} {:>10} {:>10} {:>10} {:>10}", 
+        "Operation", "Current", "Baseline", "Diff %", "P95 Cur", "P95 Base");
+    println!("{}", "-".repeat(100));
+    
+    for result in results {
+        // Find matching baseline result by name
+        if let Some(baseline_result) = baseline.results.iter().find(|r| r.result.name == result.name) {
+            let current_ops = result.ops_per_sec();
+            let baseline_ops = baseline_result.ops_per_sec;
+            let diff_pct = ((current_ops - baseline_ops) / baseline_ops) * 100.0;
+            
+            // Color code: green for improvements (>5%), red for regressions (<-5%)
+            let diff_str = if diff_pct > 5.0 {
+                format!("🟢 +{:.1}%", diff_pct)
+            } else if diff_pct < -5.0 {
+                format!("🔴 {:.1}%", diff_pct)
+            } else {
+                format!("  {:.1}%", diff_pct)
+            };
+            
+            println!("{:<30} {:>10.1} {:>10.1} {:>10} {:>10.2} {:>10.2}",
+                result.name,
+                current_ops,
+                baseline_ops,
+                diff_str,
+                result.percentiles.p95.as_secs_f64() * 1000.0,
+                baseline_result.p95_ms,
+            );
+        } else {
+            // New operation not in baseline
+            println!("{:<30} {:>10.1} {:>10} {:>10} {:>10.2} {:>10}",
+                result.name,
+                result.ops_per_sec(),
+                "-",
+                "NEW",
+                result.percentiles.p95.as_secs_f64() * 1000.0,
+                "-",
+            );
+        }
+    }
+    
+    println!("{}", "=".repeat(100));
+    println!("🟢 = Improvement >5%  |  🔴 = Regression >5%");
+    println!("{}", "=".repeat(100));
+}
+
+fn bench_aes_encrypt_size(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    data_size: usize,
+    size_label: &str,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
+    let key = find_key(session, key_label, ObjectClass::SECRET_KEY)?;
+    let data = vec![0u8; data_size];
+    
+    run_benchmark_with_warmup(
+        format!("AES-256-GCM Encrypt ({})", size_label),
+        iterations,
+        warmup,
+        show_progress,
+        || {
+            let mut iv = vec![0u8; 12];
+            session.generate_random_slice(&mut iv)?;
+            let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], 128.into())?);
+            let _ = session.encrypt(&mechanism, key, &data)?;
+            Ok(())
+        },
+    )
+}
+
+fn bench_hash_size(
+    session: &cryptoki::session::Session,
+    name: &str,
+    mechanism: Mechanism,
+    data_size: usize,
+    size_label: &str,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
+    let data = vec![0u8; data_size];
+    
+    run_benchmark_with_warmup(
+        format!("{} Hash ({})", name, size_label),
+        iterations,
+        warmup,
+        show_progress,
+        || {
+            let _ = session.digest(&mechanism, &data)?;
+            Ok(())
+        },
+    )
 }

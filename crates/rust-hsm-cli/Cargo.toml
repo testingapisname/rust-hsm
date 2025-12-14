@@ -27,3 +27,5 @@ sysinfo = "0.32"
 
 [dev-dependencies]
 tempfile = "3.13"
+assert_cmd = "2.0"
+predicates = "3.0"
