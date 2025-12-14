@@ -400,6 +400,7 @@ fn test_invalid_format() {
 
 /// Test CSV output requires output file
 #[test]
+#[ignore] // Requires HSM setup
 fn test_csv_requires_output_file() {
     benchmark_cmd()
         .args(&[
@@ -418,6 +419,7 @@ fn test_csv_requires_output_file() {
 
 /// Test JSON output requires output file
 #[test]
+#[ignore] // Requires HSM setup
 fn test_json_requires_output_file() {
     benchmark_cmd()
         .args(&[
