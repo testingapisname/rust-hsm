@@ -203,6 +203,34 @@ When adding new commands:
 - Included in JSON output for automation
 - Implementation: [inspect.rs calculate_fingerprint()](../crates/rust-hsm-cli/src/pkcs11/keys/inspect.rs)
 
+### Troubleshooting Commands (NEW - Dec 2025!)
+
+**Purpose**: HSM diagnostic and debugging tools for troubleshooting application errors.
+
+**Implementation**: [troubleshoot.rs](../crates/rust-hsm-cli/src/pkcs11/troubleshoot.rs) - 655 lines
+
+1. **explain-error**: PKCS#11 error code decoder
+   - Pattern matching on error code strings (name, hex, decimal)
+   - 35+ error codes with descriptions, causes, and solutions
+   - Context-aware troubleshooting for operations (sign, verify, encrypt, decrypt, login, wrap)
+   - Returns `Result<()>` with formatted output to stdout
+
+2. **find-key**: Fuzzy key search with Levenshtein distance
+   - Searches for exact matches first
+   - If not found and `--show-similar`, calculates edit distance for all keys
+   - Shows keys with distance ≤3 as "similar"
+   - Displays key type, capabilities, and security flags
+   - Requires session login (uses existing session pattern)
+
+3. **diff-keys**: Side-by-side key comparison
+   - Retrieves attributes for both keys in parallel
+   - Compares 17 attributes: Class, KeyType, Token, Private, Modifiable, etc.
+   - Displays comparison table with ✓ (match) or ✗ (difference) indicators
+   - Lists all differences with severity assessment and explanations
+   - No login required for public keys, login required for private keys
+
+**Command Pattern**: These follow the same session management pattern but don't require login for read-only operations like explain-error. See [troubleshoot.rs](../crates/rust-hsm-cli/src/pkcs11/troubleshoot.rs) for reference implementations.
+
 ### Detailed Listing Flags (NEW!)
 
 **--detailed flag pattern** for enhanced output:
@@ -251,7 +279,7 @@ Check [utils.rs mechanism_name()](../crates/rust-hsm-cli/src/pkcs11/keys/utils.r
 
 ### Run Full Test Suite
 ```bash
-docker exec rust-hsm-app /app/test.sh  # 40 tests: RSA, ECDSA, AES, wrap/unwrap, CSR, hash, HMAC, CMAC, fingerprints
+docker exec rust-hsm-app /app/test.sh  # 43 tests: RSA, ECDSA, AES, wrap/unwrap, CSR, hash, HMAC, CMAC, fingerprints, troubleshooting
 ```
 
 ### Debug Mode
@@ -397,6 +425,22 @@ docker compose up -d --build
     - Measures ops/sec and latency (P50/P95/P99)
     - Tests: RSA/ECDSA signing, encryption, hashing, MACs, random generation
     - Auto-detects key types and capabilities
+
+16. **✅ COMPLETED: Troubleshooting Commands (Dec 2025)**
+    - `explain-error` - Decode 35+ PKCS#11 error codes with context-aware troubleshooting
+      - Supports name, hex, and decimal formats (CKR_PIN_INCORRECT, 0x000000A0, 160)
+      - Context flags: sign, verify, encrypt, decrypt, login, wrap
+      - Implementation: [troubleshoot.rs](../crates/rust-hsm-cli/src/pkcs11/troubleshoot.rs)
+    - `find-key` - Fuzzy key search with Levenshtein distance matching
+      - Shows exact matches and similar keys (edit distance ≤3)
+      - Displays key type, capabilities, and security flags
+      - Helps locate keys with typos or naming variations
+    - `diff-keys` - Side-by-side key comparison
+      - Compares 17 key attributes (class, type, capabilities, security flags)
+      - Shows differences with severity indicators (CRITICAL/HIGH/MEDIUM/LOW)
+      - Useful for troubleshooting "identical" keys with different behavior
+    - Documentation: [docs/commands/troubleshooting.md](../docs/commands/troubleshooting.md)
+    - Tests: 43 total (40 existing + 3 new troubleshooting tests)
 
 ### Contributing Notes
 

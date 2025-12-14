@@ -321,6 +321,29 @@ fn main() -> anyhow::Result<()> {
             };
             pkcs11::audit::audit_keys(&module_path, &token_label, &user_pin_value, json)?;
         }
+        Commands::ExplainError { error_code, context } => {
+            pkcs11::troubleshoot::explain_error(&error_code, context.as_deref())?;
+        }
+        Commands::FindKey { label, user_pin, key_label, show_similar, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label required"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
+            };
+            pkcs11::troubleshoot::find_key(&module_path, &token_label, &user_pin_value, &key_label, show_similar)?;
+        }
+        Commands::DiffKeys { label, user_pin, key1_label, key2_label, pin_stdin } => {
+            let token_label = config.token_label(label.as_deref())
+                .ok_or_else(|| anyhow::anyhow!("Token label required"))?;
+            let user_pin_value = if pin_stdin {
+                read_pin_from_stdin()?
+            } else {
+                user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
+            };
+            pkcs11::troubleshoot::diff_keys(&module_path, &token_label, &user_pin_value, &key1_label, &key2_label)?;
+        }
     }
 
     Ok(())

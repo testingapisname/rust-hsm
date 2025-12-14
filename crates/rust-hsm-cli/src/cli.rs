@@ -530,4 +530,49 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
+
+    /// Explain PKCS#11 error codes with troubleshooting steps
+    ExplainError {
+        /// Error code (e.g., 0xa0, CKR_PIN_INCORRECT, 160)
+        error_code: String,
+        /// Operation context for targeted advice (sign, verify, encrypt, decrypt, login, wrap)
+        #[arg(long)]
+        context: Option<String>,
+    },
+
+    /// Find keys with fuzzy matching and show similar results
+    FindKey {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        /// Key label pattern to search for
+        #[arg(long)]
+        key_label: String,
+        /// Show similar keys when exact match not found
+        #[arg(long)]
+        show_similar: bool,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
+
+    /// Compare two keys and show attribute differences
+    DiffKeys {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long, conflicts_with = "pin_stdin")]
+        user_pin: Option<String>,
+        /// First key label
+        #[arg(long)]
+        key1_label: String,
+        /// Second key label
+        #[arg(long)]
+        key2_label: String,
+        /// Read user PIN from stdin instead of command line
+        #[arg(long = "pin-stdin")]
+        pin_stdin: bool,
+    },
 }

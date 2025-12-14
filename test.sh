@@ -412,5 +412,22 @@ else
     exit 1
 fi
 
+echo -e "\n${GREEN}[41/43] Testing explain-error command${NC}"
+$CLI explain-error CKR_PIN_INCORRECT 2>/dev/null | grep -q "CKR_PIN_INCORRECT" && echo "✓ explain-error displays error code" || exit 1
+$CLI explain-error 0x000000A0 2>/dev/null | grep -q "CKR_PIN_INCORRECT" && echo "✓ explain-error accepts hex format" || exit 1
+$CLI explain-error 160 2>/dev/null | grep -q "CKR_PIN_INCORRECT" && echo "✓ explain-error accepts decimal format" || exit 1
+$CLI explain-error CKR_KEY_HANDLE_INVALID --context sign 2>/dev/null | grep -q "sign operation" && echo "✓ explain-error shows context-aware help" || exit 1
+
+echo -e "\n${GREEN}[42/43] Testing find-key command${NC}"
+$CLI find-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" 2>/dev/null | grep -q "Exact match found" && echo "✓ find-key locates existing key" || exit 1
+$CLI find-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "test-kez" --show-similar 2>/dev/null | grep -q "Similar keys found" && echo "✓ find-key fuzzy matching works" || exit 1
+$CLI find-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "nonexistent-key-xyz" 2>&1 | grep -q "not found" && echo "✓ find-key reports missing keys" || exit 1
+
+echo -e "\n${GREEN}[43/43] Testing diff-keys command${NC}"
+$CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "compare-key-1" --key-type rsa 2>/dev/null && echo "✓ Generated first comparison key" || exit 1
+$CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "compare-key-2" --key-type p256 2>/dev/null && echo "✓ Generated second comparison key" || exit 1
+$CLI diff-keys --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key1-label "compare-key-1" --key2-label "compare-key-2" 2>/dev/null | grep -q "Key Comparison" && echo "✓ diff-keys displays comparison" || exit 1
+$CLI diff-keys --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key1-label "compare-key-1" --key2-label "compare-key-2" 2>/dev/null | grep -q "KeyType" && echo "✓ diff-keys shows attribute differences" || exit 1
+
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
 
