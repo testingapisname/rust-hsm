@@ -511,6 +511,15 @@ pub enum Commands {
         /// Number of iterations per test
         #[arg(long, default_value = "100")]
         iterations: usize,
+        /// Output format (text, json, csv)
+        #[arg(long, default_value = "text")]
+        format: String,
+        /// Number of warmup iterations to exclude from results
+        #[arg(long, default_value = "0")]
+        warmup: usize,
+        /// Output file for JSON/CSV results (stdout if not specified)
+        #[arg(long)]
+        output: Option<String>,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
