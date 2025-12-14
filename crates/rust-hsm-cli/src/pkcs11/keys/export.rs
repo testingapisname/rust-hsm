@@ -1,10 +1,10 @@
+use base64::Engine as _;
 use cryptoki::context::{CInitializeArgs, Pkcs11};
 use cryptoki::object::{Attribute, AttributeType, ObjectHandle};
 use cryptoki::session::UserType;
 use cryptoki::types::AuthPin;
 use std::fs;
 use tracing::{debug, info, trace};
-use base64::Engine as _;
 
 use super::utils::{find_token_slot, get_key_type};
 
@@ -18,19 +18,24 @@ pub fn export_pubkey(
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("PKCS#11 module loaded successfully");
-    
+
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
     debug!("PKCS#11 library initialized");
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Exporting public key '{}' from token '{}' in slot {}", key_label, label, usize::from(slot));
+    info!(
+        "Exporting public key '{}' from token '{}' in slot {}",
+        key_label,
+        label,
+        usize::from(slot)
+    );
 
     debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_ro_session(slot)?;
     debug!("Session opened successfully");
-    
+
     let pin = AuthPin::new(user_pin.to_string());
     debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
@@ -43,7 +48,7 @@ pub fn export_pubkey(
         Attribute::Class(cryptoki::object::ObjectClass::PUBLIC_KEY),
     ];
     let objects = session.find_objects(&template)?;
-    
+
     if objects.is_empty() {
         debug!("→ Calling C_Logout, C_Finalize");
         session.logout()?;
@@ -83,7 +88,7 @@ pub fn export_pubkey(
     debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Logged out");
-    
+
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     debug!("PKCS#11 library finalized");
@@ -96,7 +101,7 @@ fn export_rsa_public_key(
     public_key: ObjectHandle,
 ) -> anyhow::Result<String> {
     debug!("→ Calling C_GetAttributeValue (Modulus, PublicExponent)");
-    
+
     // Get modulus and public exponent
     let attrs = session.get_attributes(
         public_key,
@@ -121,22 +126,23 @@ fn export_rsa_public_key(
     }
 
     let modulus = modulus.ok_or_else(|| anyhow::anyhow!("Modulus not found"))?;
-    let public_exponent = public_exponent.ok_or_else(|| anyhow::anyhow!("Public exponent not found"))?;
+    let public_exponent =
+        public_exponent.ok_or_else(|| anyhow::anyhow!("Public exponent not found"))?;
 
     // Encode as PKCS#1 RSAPublicKey (sequence of modulus and exponent)
     let mut rsa_pub_key = Vec::new();
-    
+
     // Sequence tag
     rsa_pub_key.push(0x30);
-    
+
     // Calculate length of content
     let modulus_der = encode_integer(&modulus);
     let exponent_der = encode_integer(&public_exponent);
     let content_len = modulus_der.len() + exponent_der.len();
-    
+
     // Encode length
     encode_length(&mut rsa_pub_key, content_len);
-    
+
     // Add modulus and exponent
     rsa_pub_key.extend_from_slice(&modulus_der);
     rsa_pub_key.extend_from_slice(&exponent_der);
@@ -144,10 +150,10 @@ fn export_rsa_public_key(
     // Build SubjectPublicKeyInfo structure
     // RSA algorithm OID: 1.2.840.113549.1.1.1
     let rsa_algorithm_id = build_rsa_algorithm_identifier();
-    
+
     // BIT STRING wrapping the RSA public key
     let bit_string = encode_bit_string(&rsa_pub_key);
-    
+
     // SEQUENCE { AlgorithmIdentifier, BIT STRING }
     let mut spki = Vec::new();
     spki.push(0x30); // SEQUENCE tag
@@ -155,7 +161,7 @@ fn export_rsa_public_key(
     encode_length(&mut spki, content_len);
     spki.extend_from_slice(&rsa_algorithm_id);
     spki.extend_from_slice(&bit_string);
-    
+
     Ok(encode_pem("PUBLIC KEY", &spki))
 }
 
@@ -164,7 +170,7 @@ fn export_ec_public_key(
     public_key: ObjectHandle,
 ) -> anyhow::Result<String> {
     debug!("→ Calling C_GetAttributeValue (EcPoint, EcParams)");
-    
+
     // Get EC point and parameters
     let attrs = session.get_attributes(
         public_key,
@@ -201,10 +207,10 @@ fn export_ec_public_key(
 
     // Build EC algorithm identifier with curve parameters
     let ec_algorithm_id = build_ec_algorithm_identifier(&ec_params);
-    
+
     // BIT STRING wrapping the EC point
     let bit_string = encode_bit_string(ec_point_bytes);
-    
+
     // SEQUENCE { AlgorithmIdentifier, BIT STRING }
     let mut spki = Vec::new();
     spki.push(0x30); // SEQUENCE tag
@@ -212,7 +218,7 @@ fn export_ec_public_key(
     encode_length(&mut spki, content_len);
     spki.extend_from_slice(&ec_algorithm_id);
     spki.extend_from_slice(&bit_string);
-    
+
     Ok(encode_pem("PUBLIC KEY", &spki))
 }
 
@@ -220,13 +226,17 @@ fn export_ec_public_key(
 fn encode_integer(value: &[u8]) -> Vec<u8> {
     let mut result = Vec::new();
     result.push(0x02); // INTEGER tag
-    
+
     // Check if we need to add padding for negative interpretation
     let needs_padding = value[0] & 0x80 != 0;
-    let len = if needs_padding { value.len() + 1 } else { value.len() };
-    
+    let len = if needs_padding {
+        value.len() + 1
+    } else {
+        value.len()
+    };
+
     encode_length(&mut result, len);
-    
+
     if needs_padding {
         result.push(0x00);
     }
@@ -262,12 +272,14 @@ fn encode_bit_string(data: &[u8]) -> Vec<u8> {
 fn build_rsa_algorithm_identifier() -> Vec<u8> {
     let mut result = Vec::new();
     result.push(0x30); // SEQUENCE tag
-    
+
     // RSA OID: 1.2.840.113549.1.1.1
-    let oid = vec![0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01];
+    let oid = vec![
+        0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
+    ];
     // NULL parameter
     let null = vec![0x05, 0x00];
-    
+
     encode_length(&mut result, oid.len() + null.len());
     result.extend_from_slice(&oid);
     result.extend_from_slice(&null);
@@ -278,10 +290,10 @@ fn build_rsa_algorithm_identifier() -> Vec<u8> {
 fn build_ec_algorithm_identifier(curve_params: &[u8]) -> Vec<u8> {
     let mut result = Vec::new();
     result.push(0x30); // SEQUENCE tag
-    
+
     // EC public key OID: 1.2.840.10045.2.1
     let oid = vec![0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01];
-    
+
     encode_length(&mut result, oid.len() + curve_params.len());
     result.extend_from_slice(&oid);
     result.extend_from_slice(curve_params);
@@ -291,16 +303,16 @@ fn build_ec_algorithm_identifier(curve_params: &[u8]) -> Vec<u8> {
 // Encode DER bytes as PEM format
 fn encode_pem(label: &str, data: &[u8]) -> String {
     let encoded = base64::engine::general_purpose::STANDARD.encode(data);
-    
+
     let mut pem = String::new();
     pem.push_str(&format!("-----BEGIN {}-----\n", label));
-    
+
     // Split into 64-character lines
     for chunk in encoded.as_bytes().chunks(64) {
         pem.push_str(std::str::from_utf8(chunk).unwrap());
         pem.push('\n');
     }
-    
+
     pem.push_str(&format!("-----END {}-----\n", label));
     pem
 }

@@ -1,14 +1,14 @@
+use anyhow::{Context, Result};
 use cryptoki::context::{CInitializeArgs, Pkcs11};
 use cryptoki::object::{Attribute, AttributeType, ObjectClass};
 use cryptoki::session::UserType;
 use cryptoki::types::AuthPin;
-use anyhow::{Context, Result};
+use sha2::{Digest, Sha256};
 use tracing::{debug, info};
-use sha2::{Sha256, Digest};
 
 use super::utils::find_token_slot;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Display detailed attributes for a key
@@ -21,27 +21,29 @@ pub fn inspect_key(
 ) -> Result<()> {
     let pkcs11 = Pkcs11::new(module_path)
         .with_context(|| format!("Failed to load PKCS#11 module: {}", module_path))?;
-    
-    pkcs11.initialize(CInitializeArgs::OsThreads)
+
+    pkcs11
+        .initialize(CInitializeArgs::OsThreads)
         .context("Failed to initialize PKCS#11 module")?;
 
     let slot_id = find_token_slot(&pkcs11, token_label)?;
 
     info!("Inspecting key '{}' on token '{}'", key_label, token_label);
 
-    let session = pkcs11.open_rw_session(slot_id)
+    let session = pkcs11
+        .open_rw_session(slot_id)
         .context("Failed to open read-write session")?;
-    
+
     let pin = AuthPin::new(user_pin.to_string());
-    session.login(UserType::User, Some(&pin))
+    session
+        .login(UserType::User, Some(&pin))
         .context("Failed to login with user PIN")?;
 
     // Search for all objects with this label
-    let template = vec![
-        Attribute::Label(key_label.as_bytes().to_vec()),
-    ];
+    let template = vec![Attribute::Label(key_label.as_bytes().to_vec())];
 
-    let handles = session.find_objects(&template)
+    let handles = session
+        .find_objects(&template)
         .context("Failed to search for objects")?;
 
     if handles.is_empty() {
@@ -124,7 +126,7 @@ fn calculate_fingerprint(
     if let Ok(attrs) = session.get_attributes(handle, &[AttributeType::Class]) {
         if let Some(Attribute::Class(class)) = attrs.first() {
             if *class != ObjectClass::PUBLIC_KEY {
-                return None;  // Only fingerprint public keys
+                return None; // Only fingerprint public keys
             }
         }
     }
@@ -140,10 +142,13 @@ fn calculate_fingerprint(
     let mut has_data = false;
 
     // Try RSA attributes first (modulus + public exponent)
-    if let Ok(attrs) = session.get_attributes(handle, &[AttributeType::Modulus, AttributeType::PublicExponent]) {
+    if let Ok(attrs) = session.get_attributes(
+        handle,
+        &[AttributeType::Modulus, AttributeType::PublicExponent],
+    ) {
         let mut found_modulus = false;
         let mut found_exponent = false;
-        
+
         for attr in attrs {
             match attr {
                 Attribute::Modulus(m) => {
@@ -157,15 +162,17 @@ fn calculate_fingerprint(
                 _ => {}
             }
         }
-        
+
         if found_modulus && found_exponent {
             has_data = true;
         }
     }
-    
+
     // If not RSA, try EC attributes (params + point)
     if !has_data {
-        if let Ok(attrs) = session.get_attributes(handle, &[AttributeType::EcParams, AttributeType::EcPoint]) {
+        if let Ok(attrs) =
+            session.get_attributes(handle, &[AttributeType::EcParams, AttributeType::EcPoint])
+        {
             for attr in attrs {
                 match attr {
                     Attribute::EcParams(p) => {
@@ -181,19 +188,20 @@ fn calculate_fingerprint(
             }
         }
     }
-    
+
     if !has_data {
-        return None;  // No key material found
+        return None; // No key material found
     }
 
     let result = hasher.finalize();
-    
+
     // Format as colon-separated hex (like SSH fingerprints)
-    let fingerprint = result.iter()
+    let fingerprint = result
+        .iter()
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<_>>()
         .join(":");
-    
+
     Some(fingerprint)
 }
 
@@ -266,7 +274,11 @@ fn print_attribute(attr: &Attribute, attr_type: AttributeType) {
             println!("  CKA_VALUE_LEN:          {} bytes", u64::from(*len));
         }
         Attribute::Modulus(m) => {
-            println!("  CKA_MODULUS:            {} bits ({} bytes)", m.len() * 8, m.len());
+            println!(
+                "  CKA_MODULUS:            {} bits ({} bytes)",
+                m.len() * 8,
+                m.len()
+            );
         }
         Attribute::PublicExponent(e) => {
             let exp_val = if e.len() <= 8 {
@@ -309,7 +321,7 @@ fn output_json_inspect(
         object_count: usize,
         objects: Vec<KeyObject>,
     }
-    
+
     #[derive(Serialize)]
     struct KeyObject {
         handle: String,
@@ -317,15 +329,15 @@ fn output_json_inspect(
         fingerprint: Option<String>,
         attributes: HashMap<String, serde_json::Value>,
     }
-    
+
     let mut objects = Vec::new();
-    
+
     for handle in handles {
         let mut attributes = HashMap::new();
-        
+
         // Calculate fingerprint
         let fingerprint = calculate_fingerprint(session, *handle);
-        
+
         for attr_type in attrs_to_query {
             if let Ok(attrs) = session.get_attributes(*handle, &[*attr_type]) {
                 if let Some(attr) = attrs.first() {
@@ -336,27 +348,27 @@ fn output_json_inspect(
                 }
             }
         }
-        
+
         objects.push(KeyObject {
             handle: format!("{:?}", handle),
             fingerprint,
             attributes,
         });
     }
-    
+
     let inspection = KeyInspection {
         key_label: key_label.to_string(),
         object_count: handles.len(),
         objects,
     };
-    
+
     println!("{}", serde_json::to_string_pretty(&inspection)?);
     Ok(())
 }
 
 fn attribute_to_json(attr: &Attribute) -> (String, Option<serde_json::Value>) {
     use serde_json::json;
-    
+
     match attr {
         Attribute::Class(c) => ("CKA_CLASS".to_string(), Some(json!(format!("{:?}", c)))),
         Attribute::KeyType(kt) => ("CKA_KEY_TYPE".to_string(), Some(json!(format!("{:?}", kt)))),
@@ -371,7 +383,10 @@ fn attribute_to_json(attr: &Attribute) -> (String, Option<serde_json::Value>) {
             if let Ok(s) = String::from_utf8(id.clone()) {
                 ("CKA_ID".to_string(), Some(json!(s)))
             } else {
-                ("CKA_ID".to_string(), Some(json!({ "type": "binary", "length": id.len() })))
+                (
+                    "CKA_ID".to_string(),
+                    Some(json!({ "type": "binary", "length": id.len() })),
+                )
             }
         }
         Attribute::Token(b) => ("CKA_TOKEN".to_string(), Some(json!(b))),
@@ -390,7 +405,10 @@ fn attribute_to_json(attr: &Attribute) -> (String, Option<serde_json::Value>) {
         Attribute::AlwaysSensitive(b) => ("CKA_ALWAYS_SENSITIVE".to_string(), Some(json!(b))),
         Attribute::NeverExtractable(b) => ("CKA_NEVER_EXTRACTABLE".to_string(), Some(json!(b))),
         Attribute::ValueLen(len) => ("CKA_VALUE_LEN".to_string(), Some(json!(u64::from(*len)))),
-        Attribute::Modulus(m) => ("CKA_MODULUS".to_string(), Some(json!({"bits": m.len() * 8, "bytes": m.len()}))),
+        Attribute::Modulus(m) => (
+            "CKA_MODULUS".to_string(),
+            Some(json!({"bits": m.len() * 8, "bytes": m.len()})),
+        ),
         Attribute::PublicExponent(e) => {
             if e.len() <= 8 {
                 let mut val: u64 = 0;
@@ -399,7 +417,10 @@ fn attribute_to_json(attr: &Attribute) -> (String, Option<serde_json::Value>) {
                 }
                 ("CKA_PUBLIC_EXPONENT".to_string(), Some(json!(val)))
             } else {
-                ("CKA_PUBLIC_EXPONENT".to_string(), Some(json!({"bytes": e.len()})))
+                (
+                    "CKA_PUBLIC_EXPONENT".to_string(),
+                    Some(json!({"bytes": e.len()})),
+                )
             }
         }
         Attribute::EcParams(p) => {
@@ -408,7 +429,10 @@ fn attribute_to_json(attr: &Attribute) -> (String, Option<serde_json::Value>) {
                 [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22] => "P-384 (secp384r1)",
                 _ => "Unknown curve",
             };
-            ("CKA_EC_PARAMS".to_string(), Some(json!({"curve": curve, "bytes": p.len()})))
+            (
+                "CKA_EC_PARAMS".to_string(),
+                Some(json!({"curve": curve, "bytes": p.len()})),
+            )
         }
         Attribute::EcPoint(pt) => ("CKA_EC_POINT".to_string(), Some(json!({"bytes": pt.len()}))),
         _ => ("UNKNOWN".to_string(), None),

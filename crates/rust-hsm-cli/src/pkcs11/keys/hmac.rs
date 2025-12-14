@@ -20,19 +20,25 @@ pub fn gen_hmac_key(
 ) -> Result<()> {
     let pkcs11 = Pkcs11::new(module_path)
         .with_context(|| format!("Failed to load PKCS#11 module: {}", module_path))?;
-    
-    pkcs11.initialize(cryptoki::context::CInitializeArgs::OsThreads)
+
+    pkcs11
+        .initialize(cryptoki::context::CInitializeArgs::OsThreads)
         .context("Failed to initialize PKCS#11 module")?;
 
     let slot_id = find_token_slot(&pkcs11, token_label)?;
 
-    info!("Generating HMAC-{} key on token '{}' in slot {}", bits, token_label, slot_id);
+    info!(
+        "Generating HMAC-{} key on token '{}' in slot {}",
+        bits, token_label, slot_id
+    );
 
-    let session = pkcs11.open_rw_session(slot_id)
+    let session = pkcs11
+        .open_rw_session(slot_id)
         .context("Failed to open read-write session")?;
-    
+
     let pin = AuthPin::new(user_pin.to_string());
-    session.login(UserType::User, Some(&pin))
+    session
+        .login(UserType::User, Some(&pin))
         .context("Failed to login with user PIN")?;
 
     // Generic secret key attributes for HMAC
@@ -46,12 +52,13 @@ pub fn gen_hmac_key(
         Attribute::ValueLen(Ulong::from((bits / 8) as u64)),
     ];
 
-    let key_handle = session.generate_key(&Mechanism::GenericSecretKeyGen, &key_template)
+    let key_handle = session
+        .generate_key(&Mechanism::GenericSecretKeyGen, &key_template)
         .context("Failed to generate HMAC key")?;
 
     println!("HMAC-{} key '{}' generated successfully", bits, key_label);
     println!("  Key handle: {:?}", key_handle);
-    
+
     Ok(())
 }
 
@@ -67,35 +74,43 @@ pub fn hmac_sign(
 ) -> Result<()> {
     let pkcs11 = Pkcs11::new(module_path)
         .with_context(|| format!("Failed to load PKCS#11 module: {}", module_path))?;
-    
-    pkcs11.initialize(cryptoki::context::CInitializeArgs::OsThreads)
+
+    pkcs11
+        .initialize(cryptoki::context::CInitializeArgs::OsThreads)
         .context("Failed to initialize PKCS#11 module")?;
 
     let slot_id = find_token_slot(&pkcs11, token_label)?;
 
-    info!("Computing HMAC with {} for key '{}' on token '{}'", algorithm, key_label, token_label);
+    info!(
+        "Computing HMAC with {} for key '{}' on token '{}'",
+        algorithm, key_label, token_label
+    );
 
-    let session = pkcs11.open_rw_session(slot_id)
+    let session = pkcs11
+        .open_rw_session(slot_id)
         .context("Failed to open read-write session")?;
-    
+
     let pin = AuthPin::new(user_pin.to_string());
-    session.login(UserType::User, Some(&pin))
+    session
+        .login(UserType::User, Some(&pin))
         .context("Failed to login with user PIN")?;
 
     // Find the HMAC key
-    let key_handles = session.find_objects(&[
-        Attribute::Class(ObjectClass::SECRET_KEY),
-        Attribute::Label(key_label.as_bytes().to_vec()),
-    ])
-    .context("Failed to search for key")?;
+    let key_handles = session
+        .find_objects(&[
+            Attribute::Class(ObjectClass::SECRET_KEY),
+            Attribute::Label(key_label.as_bytes().to_vec()),
+        ])
+        .context("Failed to search for key")?;
 
-    let key_handle = key_handles.first()
+    let key_handle = key_handles
+        .first()
         .ok_or_else(|| anyhow::anyhow!("HMAC key '{}' not found", key_label))?;
 
     // Read input data
     let data = fs::read(input_path)
         .with_context(|| format!("Failed to read input file: {}", input_path.display()))?;
-    
+
     info!("Read {} bytes from {}", data.len(), input_path.display());
 
     // Select HMAC mechanism
@@ -105,11 +120,15 @@ pub fn hmac_sign(
         "sha384" | "sha-384" => Mechanism::Sha384Hmac,
         "sha512" | "sha-512" => Mechanism::Sha512Hmac,
         "sha224" | "sha-224" => Mechanism::Sha224Hmac,
-        _ => anyhow::bail!("Unsupported HMAC algorithm: {}. Supported: sha1, sha256, sha384, sha512, sha224", algorithm),
+        _ => anyhow::bail!(
+            "Unsupported HMAC algorithm: {}. Supported: sha1, sha256, sha384, sha512, sha224",
+            algorithm
+        ),
     };
 
     // Compute HMAC
-    let hmac = session.sign(&mechanism, *key_handle, &data)
+    let hmac = session
+        .sign(&mechanism, *key_handle, &data)
         .context("Failed to compute HMAC")?;
 
     info!("Generated {}-byte HMAC", hmac.len());
@@ -118,10 +137,13 @@ pub fn hmac_sign(
     fs::write(output_path, &hmac)
         .with_context(|| format!("Failed to write HMAC to: {}", output_path.display()))?;
 
-    println!("HMAC computed successfully with {}", algorithm.to_uppercase());
+    println!(
+        "HMAC computed successfully with {}",
+        algorithm.to_uppercase()
+    );
     println!("  Input: {} ({} bytes)", input_path.display(), data.len());
     println!("  Output: {} ({} bytes)", output_path.display(), hmac.len());
-    
+
     Ok(())
 }
 
@@ -137,39 +159,51 @@ pub fn hmac_verify(
 ) -> Result<()> {
     let pkcs11 = Pkcs11::new(module_path)
         .with_context(|| format!("Failed to load PKCS#11 module: {}", module_path))?;
-    
-    pkcs11.initialize(cryptoki::context::CInitializeArgs::OsThreads)
+
+    pkcs11
+        .initialize(cryptoki::context::CInitializeArgs::OsThreads)
         .context("Failed to initialize PKCS#11 module")?;
 
     let slot_id = find_token_slot(&pkcs11, token_label)?;
 
-    info!("Verifying HMAC with {} for key '{}' on token '{}'", algorithm, key_label, token_label);
+    info!(
+        "Verifying HMAC with {} for key '{}' on token '{}'",
+        algorithm, key_label, token_label
+    );
 
-    let session = pkcs11.open_rw_session(slot_id)
+    let session = pkcs11
+        .open_rw_session(slot_id)
         .context("Failed to open read-write session")?;
-    
+
     let pin = AuthPin::new(user_pin.to_string());
-    session.login(UserType::User, Some(&pin))
+    session
+        .login(UserType::User, Some(&pin))
         .context("Failed to login with user PIN")?;
 
     // Find the HMAC key
-    let key_handles = session.find_objects(&[
-        Attribute::Class(ObjectClass::SECRET_KEY),
-        Attribute::Label(key_label.as_bytes().to_vec()),
-    ])
-    .context("Failed to search for key")?;
+    let key_handles = session
+        .find_objects(&[
+            Attribute::Class(ObjectClass::SECRET_KEY),
+            Attribute::Label(key_label.as_bytes().to_vec()),
+        ])
+        .context("Failed to search for key")?;
 
-    let key_handle = key_handles.first()
+    let key_handle = key_handles
+        .first()
         .ok_or_else(|| anyhow::anyhow!("HMAC key '{}' not found", key_label))?;
 
     // Read input data and HMAC
     let data = fs::read(input_path)
         .with_context(|| format!("Failed to read input file: {}", input_path.display()))?;
-    
+
     let hmac = fs::read(hmac_path)
         .with_context(|| format!("Failed to read HMAC file: {}", hmac_path.display()))?;
-    
-    info!("Read {} bytes data and {}-byte HMAC", data.len(), hmac.len());
+
+    info!(
+        "Read {} bytes data and {}-byte HMAC",
+        data.len(),
+        hmac.len()
+    );
 
     // Select HMAC mechanism
     let mechanism = match algorithm.to_lowercase().as_str() {
@@ -178,7 +212,10 @@ pub fn hmac_verify(
         "sha384" | "sha-384" => Mechanism::Sha384Hmac,
         "sha512" | "sha-512" => Mechanism::Sha512Hmac,
         "sha224" | "sha-224" => Mechanism::Sha224Hmac,
-        _ => anyhow::bail!("Unsupported HMAC algorithm: {}. Supported: sha1, sha256, sha384, sha512, sha224", algorithm),
+        _ => anyhow::bail!(
+            "Unsupported HMAC algorithm: {}. Supported: sha1, sha256, sha384, sha512, sha224",
+            algorithm
+        ),
     };
 
     // Verify HMAC
@@ -205,7 +242,16 @@ mod tests {
         for algo in algorithms {
             assert!(matches!(
                 algo.to_lowercase().as_str(),
-                "sha1" | "sha-1" | "sha256" | "sha-256" | "sha384" | "sha-384" | "sha512" | "sha-512" | "sha224" | "sha-224"
+                "sha1"
+                    | "sha-1"
+                    | "sha256"
+                    | "sha-256"
+                    | "sha384"
+                    | "sha-384"
+                    | "sha512"
+                    | "sha-512"
+                    | "sha224"
+                    | "sha-224"
             ));
         }
     }

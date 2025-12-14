@@ -18,7 +18,7 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         0x0000000d => Some("CKM_RSA_X9_31_KEY_PAIR_GEN"),
         0x0000000e => Some("CKM_RSA_X9_31"),
         0x0000000f => Some("CKM_SHA1_RSA_X9_31"),
-        
+
         // DSA mechanisms
         0x00000010 => Some("CKM_DSA_KEY_PAIR_GEN"),
         0x00000011 => Some("CKM_DSA"),
@@ -27,11 +27,11 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         0x00000014 => Some("CKM_DSA_SHA256"),
         0x00000015 => Some("CKM_DSA_SHA384"),
         0x00000016 => Some("CKM_DSA_SHA512"),
-        
+
         // DH mechanisms
         0x00000020 => Some("CKM_DH_PKCS_KEY_PAIR_GEN"),
         0x00000021 => Some("CKM_DH_PKCS_DERIVE"),
-        
+
         // DES mechanisms
         0x00000120 => Some("CKM_DES_KEY_GEN"),
         0x00000121 => Some("CKM_DES_ECB"),
@@ -46,7 +46,7 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         0x00000135 => Some("CKM_DES3_MAC"),
         0x00000136 => Some("CKM_DES3_MAC_GENERAL"),
         0x00000137 => Some("CKM_DES3_CBC_PAD"),
-        
+
         // Hash mechanisms
         0x00000220 => Some("CKM_SHA_1"),
         0x00000250 => Some("CKM_SHA256"),
@@ -55,7 +55,7 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         0x00000256 => Some("CKM_SHA512"),
         0x00000260 => Some("CKM_SHA512_224"),
         0x00000261 => Some("CKM_SHA512_256"),
-        
+
         // HMAC mechanisms
         0x00000221 => Some("CKM_SHA_1_HMAC"),
         0x00000222 => Some("CKM_SHA_1_HMAC_GENERAL"),
@@ -71,7 +71,7 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         0x00000263 => Some("CKM_SHA512_224_HMAC_GENERAL"),
         0x00000264 => Some("CKM_SHA512_256_HMAC"),
         0x00000265 => Some("CKM_SHA512_256_HMAC_GENERAL"),
-        
+
         // AES mechanisms
         0x00001080 => Some("CKM_AES_KEY_GEN"),
         0x00001081 => Some("CKM_AES_ECB"),
@@ -87,7 +87,7 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         0x00001091 => Some("CKM_AES_CMAC_GENERAL"),
         0x00002109 => Some("CKM_AES_KEY_WRAP"),
         0x0000210a => Some("CKM_AES_KEY_WRAP_PAD"),
-        
+
         // EC mechanisms
         0x00001040 => Some("CKM_EC_KEY_PAIR_GEN"),
         0x00001041 => Some("CKM_ECDSA"),
@@ -99,10 +99,10 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         0x00001050 => Some("CKM_ECDH1_DERIVE"),
         0x00001051 => Some("CKM_ECDH1_COFACTOR_DERIVE"),
         0x00001052 => Some("CKM_ECMQV_DERIVE"),
-        
+
         // Generic secret key
         0x00000350 => Some("CKM_GENERIC_SECRET_KEY_GEN"),
-        
+
         // Additional mechanisms found in SoftHSM
         0x0000108a => Some("CKM_AES_XCBC_MAC"),
         0x00001055 => Some("CKM_ECDH_AES_KEY_WRAP"),
@@ -110,7 +110,7 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         0x00000270 => Some("CKM_SHA3_256"),
         0x00000271 => Some("CKM_SHA3_256_HMAC"),
         0x00001105 => Some("CKM_SP800_108_COUNTER_KDF"),
-        
+
         // DSA mechanisms (0x0040-0x005f range)
         0x00000040 => Some("CKM_DSA_PARAMETER_GEN"),
         0x00000041 => Some("CKM_DSA_PROBABLISTIC_PARAMETER_GEN"),
@@ -118,7 +118,7 @@ pub fn mechanism_name(val: u64) -> Option<&'static str> {
         0x00000043 => Some("CKM_DSA_FIPS_G_GEN"),
         0x00000044 => Some("CKM_AES_OFB"),
         0x00000045 => Some("CKM_AES_CFB64"),
-        
+
         _ => None,
     }
 }

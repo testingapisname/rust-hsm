@@ -1,17 +1,17 @@
+use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use cryptoki::context::{CInitializeArgs, Pkcs11};
 use cryptoki::mechanism::Mechanism;
 use cryptoki::object::{Attribute, ObjectClass};
 use cryptoki::session::UserType;
 use cryptoki::types::AuthPin;
-use anyhow::{Context, Result};
-use std::time::{Duration, Instant};
+use indicatif::{ProgressBar, ProgressStyle};
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
-use tracing::info;
-use serde::{Serialize, Deserialize};
-use chrono::{DateTime, Utc};
-use indicatif::{ProgressBar, ProgressStyle};
+use std::time::{Duration, Instant};
 use sysinfo::System;
+use tracing::info;
 
 use super::keys::find_token_slot;
 
@@ -19,11 +19,20 @@ use super::keys::find_token_slot;
 struct BenchmarkResult {
     name: String,
     iterations: usize,
-    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
+    #[serde(
+        serialize_with = "serialize_duration_ms",
+        deserialize_with = "deserialize_duration_ms"
+    )]
     total_duration: Duration,
-    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
+    #[serde(
+        serialize_with = "serialize_duration_ms",
+        deserialize_with = "deserialize_duration_ms"
+    )]
     min: Duration,
-    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
+    #[serde(
+        serialize_with = "serialize_duration_ms",
+        deserialize_with = "deserialize_duration_ms"
+    )]
     max: Duration,
     percentiles: Percentiles,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -47,11 +56,20 @@ where
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Percentiles {
-    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
+    #[serde(
+        serialize_with = "serialize_duration_ms",
+        deserialize_with = "deserialize_duration_ms"
+    )]
     p50: Duration,
-    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
+    #[serde(
+        serialize_with = "serialize_duration_ms",
+        deserialize_with = "deserialize_duration_ms"
+    )]
     p95: Duration,
-    #[serde(serialize_with = "serialize_duration_ms", deserialize_with = "deserialize_duration_ms")]
+    #[serde(
+        serialize_with = "serialize_duration_ms",
+        deserialize_with = "deserialize_duration_ms"
+    )]
     p99: Duration,
 }
 
@@ -103,7 +121,7 @@ impl BenchmarkResult {
         let p50_idx = (durations.len() as f64 * 0.50) as usize;
         let p95_idx = (durations.len() as f64 * 0.95) as usize;
         let p99_idx = (durations.len() as f64 * 0.99) as usize;
-        
+
         Percentiles {
             p50: durations[p50_idx.min(durations.len() - 1)],
             p95: durations[p95_idx.min(durations.len() - 1)],
@@ -160,14 +178,14 @@ pub fn run_full_benchmark(
     data_sizes: bool,
 ) -> Result<()> {
     let show_progress = format == "text" && output_file.is_none();
-    
+
     // Load comparison baseline if provided
     let baseline = if let Some(path) = compare_file {
         Some(load_baseline(path)?)
     } else {
         None
     };
-    
+
     if show_progress {
         println!("\n{}", "=".repeat(80));
         println!("HSM Performance Benchmark Suite");
@@ -194,8 +212,9 @@ pub fn run_full_benchmark(
 
     let pkcs11 = Pkcs11::new(module_path)
         .with_context(|| format!("Failed to load PKCS#11 module: {}", module_path))?;
-    
-    pkcs11.initialize(CInitializeArgs::OsThreads)
+
+    pkcs11
+        .initialize(CInitializeArgs::OsThreads)
         .context("Failed to initialize PKCS#11 module")?;
 
     let slot = find_token_slot(&pkcs11, token_label)?;
@@ -208,7 +227,13 @@ pub fn run_full_benchmark(
     if let Some(key_label) = key_label {
         // Benchmark specific user key
         info!("Benchmarking specific key: {}", key_label);
-        results.extend(benchmark_specific_key(&session, key_label, iterations, warmup, show_progress)?);
+        results.extend(benchmark_specific_key(
+            &session,
+            key_label,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
     } else {
         // Generate test keys and run full suite
         info!("Setting up test keys for benchmarking...");
@@ -218,55 +243,162 @@ pub fn run_full_benchmark(
         if show_progress {
             println!("\n📝 SIGNING OPERATIONS\n");
         }
-        results.push(bench_rsa_sign(&session, "bench-rsa-2048", 2048, iterations, warmup, show_progress)?);
-        results.push(bench_rsa_sign(&session, "bench-rsa-4096", 4096, iterations, warmup, show_progress)?);
-        results.push(bench_ecdsa_sign(&session, "bench-p256", "P-256", iterations, warmup, show_progress)?);
-        results.push(bench_ecdsa_sign(&session, "bench-p384", "P-384", iterations, warmup, show_progress)?);
+        results.push(bench_rsa_sign(
+            &session,
+            "bench-rsa-2048",
+            2048,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_rsa_sign(
+            &session,
+            "bench-rsa-4096",
+            4096,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_ecdsa_sign(
+            &session,
+            "bench-p256",
+            "P-256",
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_ecdsa_sign(
+            &session,
+            "bench-p384",
+            "P-384",
+            iterations,
+            warmup,
+            show_progress,
+        )?);
 
         // Benchmark verification operations
         if show_progress {
             println!("\n✅ VERIFICATION OPERATIONS\n");
         }
-        results.push(bench_rsa_verify(&session, "bench-rsa-2048", iterations, warmup, show_progress)?);
-        results.push(bench_ecdsa_verify(&session, "bench-p256", iterations, warmup, show_progress)?);
+        results.push(bench_rsa_verify(
+            &session,
+            "bench-rsa-2048",
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_ecdsa_verify(
+            &session,
+            "bench-p256",
+            iterations,
+            warmup,
+            show_progress,
+        )?);
 
         // Benchmark encryption operations
         if show_progress {
             println!("\n🔐 ENCRYPTION OPERATIONS\n");
         }
-        results.push(bench_rsa_encrypt(&session, "bench-rsa-2048", iterations, warmup, show_progress)?);
-        results.push(bench_aes_encrypt(&session, "bench-aes-256", iterations, warmup, show_progress)?);
+        results.push(bench_rsa_encrypt(
+            &session,
+            "bench-rsa-2048",
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_aes_encrypt(
+            &session,
+            "bench-aes-256",
+            iterations,
+            warmup,
+            show_progress,
+        )?);
 
         // Benchmark hash operations
         if show_progress {
             println!("\n#️⃣ HASH OPERATIONS\n");
         }
-        results.push(bench_hash(&session, "SHA-256", Mechanism::Sha256, iterations, warmup, show_progress)?);
-        results.push(bench_hash(&session, "SHA-384", Mechanism::Sha384, iterations, warmup, show_progress)?);
-        results.push(bench_hash(&session, "SHA-512", Mechanism::Sha512, iterations, warmup, show_progress)?);
+        results.push(bench_hash(
+            &session,
+            "SHA-256",
+            Mechanism::Sha256,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_hash(
+            &session,
+            "SHA-384",
+            Mechanism::Sha384,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_hash(
+            &session,
+            "SHA-512",
+            Mechanism::Sha512,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
 
         // Benchmark MAC operations
         if show_progress {
             println!("\n🔏 MAC OPERATIONS\n");
         }
-        results.push(bench_hmac(&session, "bench-hmac-key", iterations, warmup, show_progress)?);
-        results.push(bench_cmac(&session, "bench-cmac-key", iterations, warmup, show_progress)?);
+        results.push(bench_hmac(
+            &session,
+            "bench-hmac-key",
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_cmac(
+            &session,
+            "bench-cmac-key",
+            iterations,
+            warmup,
+            show_progress,
+        )?);
 
         // Benchmark random generation
         if show_progress {
             println!("\n🎲 RANDOM GENERATION\n");
         }
         results.push(bench_random(&session, iterations, warmup, show_progress)?);
-        
+
         // Data size variation tests (if enabled)
         if data_sizes {
             if show_progress {
                 println!("\n📊 DATA SIZE VARIATION\n");
             }
-            let sizes = vec![(1024, "1KB"), (10240, "10KB"), (102400, "100KB"), (1048576, "1MB")];
+            let sizes = vec![
+                (1024, "1KB"),
+                (10240, "10KB"),
+                (102400, "100KB"),
+                (1048576, "1MB"),
+            ];
             for (size, label) in sizes {
-                results.push(bench_aes_encrypt_size(&session, "bench-aes-256", size, label, iterations, warmup, show_progress)?);
-                results.push(bench_hash_size(&session, "SHA-256", Mechanism::Sha256, size, label, iterations, warmup, show_progress)?);
+                results.push(bench_aes_encrypt_size(
+                    &session,
+                    "bench-aes-256",
+                    size,
+                    label,
+                    iterations,
+                    warmup,
+                    show_progress,
+                )?);
+                results.push(bench_hash_size(
+                    &session,
+                    "SHA-256",
+                    Mechanism::Sha256,
+                    size,
+                    label,
+                    iterations,
+                    warmup,
+                    show_progress,
+                )?);
             }
         }
     }
@@ -288,12 +420,13 @@ pub fn run_full_benchmark(
 }
 
 fn setup_benchmark_keys(session: &cryptoki::session::Session) -> Result<()> {
-    use cryptoki::object::Attribute;
     use cryptoki::mechanism::Mechanism;
+    use cryptoki::object::Attribute;
 
     // Helper to check if key exists
     let key_exists = |label: &str| -> bool {
-        session.find_objects(&[Attribute::Label(label.as_bytes().to_vec())])
+        session
+            .find_objects(&[Attribute::Label(label.as_bytes().to_vec())])
             .ok()
             .and_then(|objs| objs.first().copied())
             .is_some()
@@ -301,166 +434,190 @@ fn setup_benchmark_keys(session: &cryptoki::session::Session) -> Result<()> {
 
     // RSA-2048
     if !key_exists("bench-rsa-2048") {
-        session.generate_key_pair(
-            &Mechanism::RsaPkcsKeyPairGen,
-            &[
-                Attribute::Token(true),
-                Attribute::Label(b"bench-rsa-2048".to_vec()),
-                Attribute::Id(b"bench-rsa-2048".to_vec()),
-                Attribute::Verify(true),
-                Attribute::Encrypt(true),
-                Attribute::ModulusBits(2048.into()),
-                Attribute::PublicExponent(vec![0x01, 0x00, 0x01]),
-            ],
-            &[
-                Attribute::Token(true),
-                Attribute::Private(true),
-                Attribute::Sensitive(true),
-                Attribute::Label(b"bench-rsa-2048".to_vec()),
-                Attribute::Id(b"bench-rsa-2048".to_vec()),
-                Attribute::Sign(true),
-                Attribute::Decrypt(true),
-            ],
-        ).context("Failed to generate RSA-2048 keypair")?;
+        session
+            .generate_key_pair(
+                &Mechanism::RsaPkcsKeyPairGen,
+                &[
+                    Attribute::Token(true),
+                    Attribute::Label(b"bench-rsa-2048".to_vec()),
+                    Attribute::Id(b"bench-rsa-2048".to_vec()),
+                    Attribute::Verify(true),
+                    Attribute::Encrypt(true),
+                    Attribute::ModulusBits(2048.into()),
+                    Attribute::PublicExponent(vec![0x01, 0x00, 0x01]),
+                ],
+                &[
+                    Attribute::Token(true),
+                    Attribute::Private(true),
+                    Attribute::Sensitive(true),
+                    Attribute::Label(b"bench-rsa-2048".to_vec()),
+                    Attribute::Id(b"bench-rsa-2048".to_vec()),
+                    Attribute::Sign(true),
+                    Attribute::Decrypt(true),
+                ],
+            )
+            .context("Failed to generate RSA-2048 keypair")?;
     }
 
     // RSA-4096
     if !key_exists("bench-rsa-4096") {
-        session.generate_key_pair(
-            &Mechanism::RsaPkcsKeyPairGen,
-            &[
-                Attribute::Token(true),
-                Attribute::Label(b"bench-rsa-4096".to_vec()),
-                Attribute::Id(b"bench-rsa-4096".to_vec()),
-                Attribute::Verify(true),
-                Attribute::Encrypt(true),
-                Attribute::ModulusBits(4096.into()),
-                Attribute::PublicExponent(vec![0x01, 0x00, 0x01]),
-            ],
-            &[
-                Attribute::Token(true),
-                Attribute::Private(true),
-                Attribute::Sensitive(true),
-                Attribute::Label(b"bench-rsa-4096".to_vec()),
-                Attribute::Id(b"bench-rsa-4096".to_vec()),
-                Attribute::Sign(true),
-                Attribute::Decrypt(true),
-            ],
-        ).context("Failed to generate RSA-4096 keypair")?;
+        session
+            .generate_key_pair(
+                &Mechanism::RsaPkcsKeyPairGen,
+                &[
+                    Attribute::Token(true),
+                    Attribute::Label(b"bench-rsa-4096".to_vec()),
+                    Attribute::Id(b"bench-rsa-4096".to_vec()),
+                    Attribute::Verify(true),
+                    Attribute::Encrypt(true),
+                    Attribute::ModulusBits(4096.into()),
+                    Attribute::PublicExponent(vec![0x01, 0x00, 0x01]),
+                ],
+                &[
+                    Attribute::Token(true),
+                    Attribute::Private(true),
+                    Attribute::Sensitive(true),
+                    Attribute::Label(b"bench-rsa-4096".to_vec()),
+                    Attribute::Id(b"bench-rsa-4096".to_vec()),
+                    Attribute::Sign(true),
+                    Attribute::Decrypt(true),
+                ],
+            )
+            .context("Failed to generate RSA-4096 keypair")?;
     }
 
     // ECDSA P-256
     if !key_exists("bench-p256") {
         let p256_params: &[u8] = &[0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
-        session.generate_key_pair(
-            &Mechanism::EccKeyPairGen,
-            &[
-                Attribute::Token(true),
-                Attribute::Label(b"bench-p256".to_vec()),
-                Attribute::Id(b"bench-p256".to_vec()),
-                Attribute::Verify(true),
-                Attribute::EcParams(p256_params.to_vec()),
-            ],
-            &[
-                Attribute::Token(true),
-                Attribute::Private(true),
-                Attribute::Sensitive(true),
-                Attribute::Label(b"bench-p256".to_vec()),
-                Attribute::Id(b"bench-p256".to_vec()),
-                Attribute::Sign(true),
-            ],
-        ).context("Failed to generate P-256 keypair")?;
+        session
+            .generate_key_pair(
+                &Mechanism::EccKeyPairGen,
+                &[
+                    Attribute::Token(true),
+                    Attribute::Label(b"bench-p256".to_vec()),
+                    Attribute::Id(b"bench-p256".to_vec()),
+                    Attribute::Verify(true),
+                    Attribute::EcParams(p256_params.to_vec()),
+                ],
+                &[
+                    Attribute::Token(true),
+                    Attribute::Private(true),
+                    Attribute::Sensitive(true),
+                    Attribute::Label(b"bench-p256".to_vec()),
+                    Attribute::Id(b"bench-p256".to_vec()),
+                    Attribute::Sign(true),
+                ],
+            )
+            .context("Failed to generate P-256 keypair")?;
     }
 
     // ECDSA P-384
     if !key_exists("bench-p384") {
         let p384_params: &[u8] = &[0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22];
-        session.generate_key_pair(
-            &Mechanism::EccKeyPairGen,
-            &[
-                Attribute::Token(true),
-                Attribute::Label(b"bench-p384".to_vec()),
-                Attribute::Id(b"bench-p384".to_vec()),
-                Attribute::Verify(true),
-                Attribute::EcParams(p384_params.to_vec()),
-            ],
-            &[
-                Attribute::Token(true),
-                Attribute::Private(true),
-                Attribute::Sensitive(true),
-                Attribute::Label(b"bench-p384".to_vec()),
-                Attribute::Id(b"bench-p384".to_vec()),
-                Attribute::Sign(true),
-            ],
-        ).context("Failed to generate P-384 keypair")?;
+        session
+            .generate_key_pair(
+                &Mechanism::EccKeyPairGen,
+                &[
+                    Attribute::Token(true),
+                    Attribute::Label(b"bench-p384".to_vec()),
+                    Attribute::Id(b"bench-p384".to_vec()),
+                    Attribute::Verify(true),
+                    Attribute::EcParams(p384_params.to_vec()),
+                ],
+                &[
+                    Attribute::Token(true),
+                    Attribute::Private(true),
+                    Attribute::Sensitive(true),
+                    Attribute::Label(b"bench-p384".to_vec()),
+                    Attribute::Id(b"bench-p384".to_vec()),
+                    Attribute::Sign(true),
+                ],
+            )
+            .context("Failed to generate P-384 keypair")?;
     }
 
     // AES-256
     if !key_exists("bench-aes-256") {
-        session.generate_key(
-            &Mechanism::AesKeyGen,
-            &[
-                Attribute::Token(true),
-                Attribute::Private(true),
-                Attribute::Label(b"bench-aes-256".to_vec()),
-                Attribute::Encrypt(true),
-                Attribute::Decrypt(true),
-                Attribute::ValueLen(32.into()),
-            ],
-        ).context("Failed to generate AES-256 key")?;
+        session
+            .generate_key(
+                &Mechanism::AesKeyGen,
+                &[
+                    Attribute::Token(true),
+                    Attribute::Private(true),
+                    Attribute::Label(b"bench-aes-256".to_vec()),
+                    Attribute::Encrypt(true),
+                    Attribute::Decrypt(true),
+                    Attribute::ValueLen(32.into()),
+                ],
+            )
+            .context("Failed to generate AES-256 key")?;
     }
 
     // HMAC key
     if !key_exists("bench-hmac-key") {
-        session.generate_key(
-            &Mechanism::GenericSecretKeyGen,
-            &[
-                Attribute::Token(true),
-                Attribute::Private(true),
-                Attribute::Label(b"bench-hmac-key".to_vec()),
-                Attribute::Sign(true),
-                Attribute::Verify(true),
-                Attribute::ValueLen(32.into()),
-            ],
-        ).context("Failed to generate HMAC key")?;
+        session
+            .generate_key(
+                &Mechanism::GenericSecretKeyGen,
+                &[
+                    Attribute::Token(true),
+                    Attribute::Private(true),
+                    Attribute::Label(b"bench-hmac-key".to_vec()),
+                    Attribute::Sign(true),
+                    Attribute::Verify(true),
+                    Attribute::ValueLen(32.into()),
+                ],
+            )
+            .context("Failed to generate HMAC key")?;
     }
 
     // CMAC key
     if !key_exists("bench-cmac-key") {
-        session.generate_key(
-            &Mechanism::AesKeyGen,
-            &[
-                Attribute::Token(true),
-                Attribute::Private(true),
-                Attribute::Label(b"bench-cmac-key".to_vec()),
-                Attribute::Sign(true),
-                Attribute::Verify(true),
-                Attribute::ValueLen(32.into()),
-            ],
-        ).context("Failed to generate CMAC key")?;
+        session
+            .generate_key(
+                &Mechanism::AesKeyGen,
+                &[
+                    Attribute::Token(true),
+                    Attribute::Private(true),
+                    Attribute::Label(b"bench-cmac-key".to_vec()),
+                    Attribute::Sign(true),
+                    Attribute::Verify(true),
+                    Attribute::ValueLen(32.into()),
+                ],
+            )
+            .context("Failed to generate CMAC key")?;
     }
 
     Ok(())
 }
 
-fn find_key(session: &cryptoki::session::Session, label: &str, class: ObjectClass) -> Result<cryptoki::object::ObjectHandle> {
+fn find_key(
+    session: &cryptoki::session::Session,
+    label: &str,
+    class: ObjectClass,
+) -> Result<cryptoki::object::ObjectHandle> {
     let objects = session.find_objects(&[
         Attribute::Class(class),
         Attribute::Label(label.as_bytes().to_vec()),
     ])?;
-    objects.first().copied().ok_or_else(|| anyhow::anyhow!("Key not found: {}", label))
+    objects
+        .first()
+        .copied()
+        .ok_or_else(|| anyhow::anyhow!("Key not found: {}", label))
 }
 
 fn detect_key_type(session: &cryptoki::session::Session, label: &str) -> Result<String> {
     use cryptoki::object::KeyType;
-    
+
     // Try to find as private key first
     if let Ok(key) = find_key(session, label, ObjectClass::PRIVATE_KEY) {
-        let attrs = session.get_attributes(key, &[
-            cryptoki::object::AttributeType::KeyType,
-            cryptoki::object::AttributeType::ModulusBits,
-        ])?;
-        
+        let attrs = session.get_attributes(
+            key,
+            &[
+                cryptoki::object::AttributeType::KeyType,
+                cryptoki::object::AttributeType::ModulusBits,
+            ],
+        )?;
+
         for attr in &attrs {
             if let Attribute::KeyType(key_type) = attr {
                 match key_type {
@@ -475,7 +632,8 @@ fn detect_key_type(session: &cryptoki::session::Session, label: &str) -> Result<
                     }
                     &KeyType::EC => {
                         // Try to determine curve
-                        let ec_attrs = session.get_attributes(key, &[cryptoki::object::AttributeType::EcParams])?;
+                        let ec_attrs = session
+                            .get_attributes(key, &[cryptoki::object::AttributeType::EcParams])?;
                         for attr in ec_attrs {
                             if let Attribute::EcParams(params) = attr {
                                 // P-256: [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07]
@@ -495,7 +653,7 @@ fn detect_key_type(session: &cryptoki::session::Session, label: &str) -> Result<
             }
         }
     }
-    
+
     // Try as secret key
     if let Ok(key) = find_key(session, label, ObjectClass::SECRET_KEY) {
         let attrs = session.get_attributes(key, &[cryptoki::object::AttributeType::KeyType])?;
@@ -509,7 +667,7 @@ fn detect_key_type(session: &cryptoki::session::Session, label: &str) -> Result<
             }
         }
     }
-    
+
     anyhow::bail!("Could not determine key type for '{}'", label)
 }
 
@@ -522,26 +680,48 @@ fn benchmark_specific_key(
 ) -> Result<Vec<BenchmarkResult>> {
     let key_type = detect_key_type(session, key_label)?;
     info!("Detected key type: {}", key_type);
-    
+
     let mut results = Vec::new();
-    
+
     if key_type.starts_with("RSA") {
         // Extract bit size
         let bits: usize = if key_type.contains("-") {
-            key_type.split('-').nth(1).and_then(|s| s.parse().ok()).unwrap_or(2048)
+            key_type
+                .split('-')
+                .nth(1)
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(2048)
         } else {
             2048
         };
-        
+
         if show_progress {
             println!("\n📝 RSA OPERATIONS\n");
             println!("Testing RSA-{} key: {}\n", bits, key_label);
         }
-        
-        results.push(bench_rsa_sign(session, key_label, bits, iterations, warmup, show_progress)?);
-        results.push(bench_rsa_verify(session, key_label, iterations, warmup, show_progress)?);
-        results.push(bench_rsa_encrypt(session, key_label, iterations, warmup, show_progress)?);
-        
+
+        results.push(bench_rsa_sign(
+            session,
+            key_label,
+            bits,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_rsa_verify(
+            session,
+            key_label,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_rsa_encrypt(
+            session,
+            key_label,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
     } else if key_type.starts_with("ECDSA") {
         let curve = if key_type.contains("P256") {
             "P-256"
@@ -550,55 +730,95 @@ fn benchmark_specific_key(
         } else {
             "P-256" // default
         };
-        
+
         if show_progress {
             println!("\n📝 ECDSA OPERATIONS\n");
             println!("Testing {} key: {}\n", key_type, key_label);
         }
-        
-        results.push(bench_ecdsa_sign(session, key_label, curve, iterations, warmup, show_progress)?);
-        results.push(bench_ecdsa_verify(session, key_label, iterations, warmup, show_progress)?);
-        
+
+        results.push(bench_ecdsa_sign(
+            session,
+            key_label,
+            curve,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
+        results.push(bench_ecdsa_verify(
+            session,
+            key_label,
+            iterations,
+            warmup,
+            show_progress,
+        )?);
     } else if key_type == "AES" || key_type == "GENERIC_SECRET" {
         if show_progress {
             println!("\n🔐 SYMMETRIC KEY OPERATIONS\n");
             println!("Testing {} key: {}\n", key_type, key_label);
         }
-        
+
         if key_type == "AES" {
             // Check if it's CMAC-capable (CKA_SIGN attribute)
             if let Ok(key) = find_key(session, key_label, ObjectClass::SECRET_KEY) {
-                let attrs = session.get_attributes(key, &[
-                    cryptoki::object::AttributeType::Sign,
-                    cryptoki::object::AttributeType::Encrypt,
-                ])?;
-                
+                let attrs = session.get_attributes(
+                    key,
+                    &[
+                        cryptoki::object::AttributeType::Sign,
+                        cryptoki::object::AttributeType::Encrypt,
+                    ],
+                )?;
+
                 let can_sign = attrs.iter().any(|a| matches!(a, Attribute::Sign(true)));
                 let can_encrypt = attrs.iter().any(|a| matches!(a, Attribute::Encrypt(true)));
-                
+
                 if can_encrypt {
-                    results.push(bench_aes_encrypt(session, key_label, iterations, warmup, show_progress)?);
+                    results.push(bench_aes_encrypt(
+                        session,
+                        key_label,
+                        iterations,
+                        warmup,
+                        show_progress,
+                    )?);
                 }
                 if can_sign {
-                    results.push(bench_cmac(session, key_label, iterations, warmup, show_progress)?);
+                    results.push(bench_cmac(
+                        session,
+                        key_label,
+                        iterations,
+                        warmup,
+                        show_progress,
+                    )?);
                 }
             }
         } else {
             // GENERIC_SECRET - assume HMAC
-            results.push(bench_hmac(session, key_label, iterations, warmup, show_progress)?);
+            results.push(bench_hmac(
+                session,
+                key_label,
+                iterations,
+                warmup,
+                show_progress,
+            )?);
         }
     } else {
         anyhow::bail!("Unsupported key type for benchmarking: {}", key_type);
     }
-    
+
     Ok(results)
 }
 
-fn bench_rsa_sign(session: &cryptoki::session::Session, key_label: &str, bits: usize, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_rsa_sign(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    bits: usize,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let key = find_key(session, key_label, ObjectClass::PRIVATE_KEY)?;
     let data = b"Benchmark data for signing operation";
     let mechanism = Mechanism::Sha256RsaPkcs;
-    
+
     run_benchmark_with_warmup(
         format!("RSA-{} Sign", bits),
         iterations,
@@ -611,14 +831,20 @@ fn bench_rsa_sign(session: &cryptoki::session::Session, key_label: &str, bits: u
     )
 }
 
-fn bench_rsa_verify(session: &cryptoki::session::Session, key_label: &str, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_rsa_verify(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let priv_key = find_key(session, key_label, ObjectClass::PRIVATE_KEY)?;
     let pub_key = find_key(session, key_label, ObjectClass::PUBLIC_KEY)?;
     let data = b"Benchmark data for verification";
     let mechanism = Mechanism::Sha256RsaPkcs;
-    
+
     let signature = session.sign(&mechanism, priv_key, data)?;
-    
+
     run_benchmark_with_warmup(
         "RSA-2048 Verify".to_string(),
         iterations,
@@ -631,17 +857,24 @@ fn bench_rsa_verify(session: &cryptoki::session::Session, key_label: &str, itera
     )
 }
 
-fn bench_ecdsa_sign(session: &cryptoki::session::Session, key_label: &str, curve: &str, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_ecdsa_sign(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    curve: &str,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let key = find_key(session, key_label, ObjectClass::PRIVATE_KEY)?;
     let data = b"Benchmark data for ECDSA signing";
     let mechanism = Mechanism::Ecdsa;
-    
+
     // Hash data first (ECDSA requires pre-hashed data)
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(data);
     let hash = hasher.finalize();
-    
+
     run_benchmark_with_warmup(
         format!("ECDSA-{} Sign", curve),
         iterations,
@@ -654,19 +887,25 @@ fn bench_ecdsa_sign(session: &cryptoki::session::Session, key_label: &str, curve
     )
 }
 
-fn bench_ecdsa_verify(session: &cryptoki::session::Session, key_label: &str, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_ecdsa_verify(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let priv_key = find_key(session, key_label, ObjectClass::PRIVATE_KEY)?;
     let pub_key = find_key(session, key_label, ObjectClass::PUBLIC_KEY)?;
     let data = b"Benchmark data for ECDSA verification";
     let mechanism = Mechanism::Ecdsa;
-    
-    use sha2::{Sha256, Digest};
+
+    use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(data);
     let hash = hasher.finalize();
-    
+
     let signature = session.sign(&mechanism, priv_key, &hash)?;
-    
+
     run_benchmark_with_warmup(
         "ECDSA-P256 Verify".to_string(),
         iterations,
@@ -679,11 +918,17 @@ fn bench_ecdsa_verify(session: &cryptoki::session::Session, key_label: &str, ite
     )
 }
 
-fn bench_rsa_encrypt(session: &cryptoki::session::Session, key_label: &str, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_rsa_encrypt(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let key = find_key(session, key_label, ObjectClass::PUBLIC_KEY)?;
     let data = b"Benchmark test data";
     let mechanism = Mechanism::RsaPkcs;
-    
+
     run_benchmark_with_warmup(
         "RSA-2048 Encrypt".to_string(),
         iterations,
@@ -696,10 +941,16 @@ fn bench_rsa_encrypt(session: &cryptoki::session::Session, key_label: &str, iter
     )
 }
 
-fn bench_aes_encrypt(session: &cryptoki::session::Session, key_label: &str, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_aes_encrypt(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let key = find_key(session, key_label, ObjectClass::SECRET_KEY)?;
     let data = vec![0u8; 1024]; // 1KB data
-    
+
     run_benchmark_with_warmup(
         "AES-256-GCM Encrypt (1KB)".to_string(),
         iterations,
@@ -708,16 +959,27 @@ fn bench_aes_encrypt(session: &cryptoki::session::Session, key_label: &str, iter
         || {
             let mut iv = vec![0u8; 12];
             session.generate_random_slice(&mut iv)?;
-            let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], 128.into())?);
+            let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(
+                &mut iv,
+                &[],
+                128.into(),
+            )?);
             let _ = session.encrypt(&mechanism, key, &data)?;
             Ok(())
         },
     )
 }
 
-fn bench_hash(session: &cryptoki::session::Session, name: &str, mechanism: Mechanism, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_hash(
+    session: &cryptoki::session::Session,
+    name: &str,
+    mechanism: Mechanism,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let data = vec![0u8; 1024]; // 1KB data
-    
+
     run_benchmark_with_warmup(
         format!("{} Hash (1KB)", name),
         iterations,
@@ -730,11 +992,17 @@ fn bench_hash(session: &cryptoki::session::Session, name: &str, mechanism: Mecha
     )
 }
 
-fn bench_hmac(session: &cryptoki::session::Session, key_label: &str, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_hmac(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let key = find_key(session, key_label, ObjectClass::SECRET_KEY)?;
     let data = b"Benchmark HMAC data";
     let mechanism = Mechanism::Sha256Hmac;
-    
+
     run_benchmark_with_warmup(
         "HMAC-SHA256".to_string(),
         iterations,
@@ -747,11 +1015,17 @@ fn bench_hmac(session: &cryptoki::session::Session, key_label: &str, iterations:
     )
 }
 
-fn bench_cmac(session: &cryptoki::session::Session, key_label: &str, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_cmac(
+    session: &cryptoki::session::Session,
+    key_label: &str,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let key = find_key(session, key_label, ObjectClass::SECRET_KEY)?;
     let data = b"Benchmark CMAC data";
     let mechanism = Mechanism::AesCMac;
-    
+
     run_benchmark_with_warmup(
         "AES-CMAC".to_string(),
         iterations,
@@ -764,9 +1038,14 @@ fn bench_cmac(session: &cryptoki::session::Session, key_label: &str, iterations:
     )
 }
 
-fn bench_random(session: &cryptoki::session::Session, iterations: usize, warmup: usize, show_progress: bool) -> Result<BenchmarkResult> {
+fn bench_random(
+    session: &cryptoki::session::Session,
+    iterations: usize,
+    warmup: usize,
+    show_progress: bool,
+) -> Result<BenchmarkResult> {
     let mut buffer = vec![0u8; 32];
-    
+
     run_benchmark_with_warmup(
         "Random (32 bytes)".to_string(),
         iterations,
@@ -888,7 +1167,10 @@ fn output_csv(results: &[BenchmarkResult], output_file: Option<&str>) -> Result<
     Ok(())
 }
 
-fn write_csv_data<W: std::io::Write>(wtr: &mut csv::Writer<W>, results: &[BenchmarkResult]) -> Result<()> {
+fn write_csv_data<W: std::io::Write>(
+    wtr: &mut csv::Writer<W>,
+    results: &[BenchmarkResult],
+) -> Result<()> {
     // Write header
     wtr.write_record(&[
         "operation",
@@ -908,7 +1190,10 @@ fn write_csv_data<W: std::io::Write>(wtr: &mut csv::Writer<W>, results: &[Benchm
         wtr.write_record(&[
             result.name.clone(),
             result.iterations.to_string(),
-            result.warmup_iterations.map(|w| w.to_string()).unwrap_or_else(|| "0".to_string()),
+            result
+                .warmup_iterations
+                .map(|w| w.to_string())
+                .unwrap_or_else(|| "0".to_string()),
             format!("{:.1}", result.ops_per_sec()),
             format!("{:.2}", result.avg_latency_ms()),
             format!("{:.2}", result.min.as_secs_f64() * 1000.0),
@@ -926,12 +1211,15 @@ fn print_summary_table(results: &[BenchmarkResult]) {
     println!("\n{}", "=".repeat(80));
     println!("BENCHMARK RESULTS SUMMARY");
     println!("{}", "=".repeat(80));
-    println!("{:<30} {:>10} {:>10} {:>10} {:>10} {:>10}", 
-        "Operation", "Ops/sec", "Avg (ms)", "P50 (ms)", "P95 (ms)", "P99 (ms)");
+    println!(
+        "{:<30} {:>10} {:>10} {:>10} {:>10} {:>10}",
+        "Operation", "Ops/sec", "Avg (ms)", "P50 (ms)", "P95 (ms)", "P99 (ms)"
+    );
     println!("{}", "-".repeat(80));
-    
+
     for result in results {
-        println!("{:<30} {:>10.1} {:>10.2} {:>10.2} {:>10.2} {:>10.2}",
+        println!(
+            "{:<30} {:>10.1} {:>10.2} {:>10.2} {:>10.2} {:>10.2}",
             result.name,
             result.ops_per_sec(),
             result.avg_latency_ms(),
@@ -940,12 +1228,12 @@ fn print_summary_table(results: &[BenchmarkResult]) {
             result.percentiles.p99.as_secs_f64() * 1000.0,
         );
     }
-    
+
     println!("{}", "=".repeat(80));
 }
 fn load_baseline(path: &str) -> Result<BenchmarkReport> {
-    let file = File::open(path)
-        .with_context(|| format!("Failed to open baseline file: {}", path))?;
+    let file =
+        File::open(path).with_context(|| format!("Failed to open baseline file: {}", path))?;
     let report: BenchmarkReport = serde_json::from_reader(file)
         .with_context(|| format!("Failed to parse baseline JSON: {}", path))?;
     Ok(report)
@@ -955,19 +1243,28 @@ fn print_comparison_table(results: &[BenchmarkResult], baseline: &BenchmarkRepor
     println!("\n{}", "=".repeat(100));
     println!("BENCHMARK COMPARISON (Current vs Baseline)");
     println!("{}", "=".repeat(100));
-    println!("Baseline: {} | {}", baseline.metadata.timestamp, baseline.metadata.token_label);
+    println!(
+        "Baseline: {} | {}",
+        baseline.metadata.timestamp, baseline.metadata.token_label
+    );
     println!("{}", "=".repeat(100));
-    println!("{:<30} {:>10} {:>10} {:>10} {:>10} {:>10}", 
-        "Operation", "Current", "Baseline", "Diff %", "P95 Cur", "P95 Base");
+    println!(
+        "{:<30} {:>10} {:>10} {:>10} {:>10} {:>10}",
+        "Operation", "Current", "Baseline", "Diff %", "P95 Cur", "P95 Base"
+    );
     println!("{}", "-".repeat(100));
-    
+
     for result in results {
         // Find matching baseline result by name
-        if let Some(baseline_result) = baseline.results.iter().find(|r| r.result.name == result.name) {
+        if let Some(baseline_result) = baseline
+            .results
+            .iter()
+            .find(|r| r.result.name == result.name)
+        {
             let current_ops = result.ops_per_sec();
             let baseline_ops = baseline_result.ops_per_sec;
             let diff_pct = ((current_ops - baseline_ops) / baseline_ops) * 100.0;
-            
+
             // Color code: green for improvements (>5%), red for regressions (<-5%)
             let diff_str = if diff_pct > 5.0 {
                 format!("🟢 +{:.1}%", diff_pct)
@@ -976,8 +1273,9 @@ fn print_comparison_table(results: &[BenchmarkResult], baseline: &BenchmarkRepor
             } else {
                 format!("  {:.1}%", diff_pct)
             };
-            
-            println!("{:<30} {:>10.1} {:>10.1} {:>10} {:>10.2} {:>10.2}",
+
+            println!(
+                "{:<30} {:>10.1} {:>10.1} {:>10} {:>10.2} {:>10.2}",
                 result.name,
                 current_ops,
                 baseline_ops,
@@ -987,7 +1285,8 @@ fn print_comparison_table(results: &[BenchmarkResult], baseline: &BenchmarkRepor
             );
         } else {
             // New operation not in baseline
-            println!("{:<30} {:>10.1} {:>10} {:>10} {:>10.2} {:>10}",
+            println!(
+                "{:<30} {:>10.1} {:>10} {:>10} {:>10.2} {:>10}",
                 result.name,
                 result.ops_per_sec(),
                 "-",
@@ -997,7 +1296,7 @@ fn print_comparison_table(results: &[BenchmarkResult], baseline: &BenchmarkRepor
             );
         }
     }
-    
+
     println!("{}", "=".repeat(100));
     println!("🟢 = Improvement >5%  |  🔴 = Regression >5%");
     println!("{}", "=".repeat(100));
@@ -1014,7 +1313,7 @@ fn bench_aes_encrypt_size(
 ) -> Result<BenchmarkResult> {
     let key = find_key(session, key_label, ObjectClass::SECRET_KEY)?;
     let data = vec![0u8; data_size];
-    
+
     run_benchmark_with_warmup(
         format!("AES-256-GCM Encrypt ({})", size_label),
         iterations,
@@ -1023,7 +1322,11 @@ fn bench_aes_encrypt_size(
         || {
             let mut iv = vec![0u8; 12];
             session.generate_random_slice(&mut iv)?;
-            let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], 128.into())?);
+            let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(
+                &mut iv,
+                &[],
+                128.into(),
+            )?);
             let _ = session.encrypt(&mechanism, key, &data)?;
             Ok(())
         },
@@ -1041,7 +1344,7 @@ fn bench_hash_size(
     show_progress: bool,
 ) -> Result<BenchmarkResult> {
     let data = vec![0u8; data_size];
-    
+
     run_benchmark_with_warmup(
         format!("{} Hash ({})", name, size_label),
         iterations,

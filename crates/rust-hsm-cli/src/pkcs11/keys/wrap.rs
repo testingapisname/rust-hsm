@@ -19,19 +19,22 @@ pub fn wrap_key(
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("PKCS#11 module loaded successfully");
-    
+
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
     debug!("PKCS#11 library initialized");
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Wrapping key '{}' with wrapping key '{}' on token '{}'", key_label, wrapping_key_label, label);
+    info!(
+        "Wrapping key '{}' with wrapping key '{}' on token '{}'",
+        key_label, wrapping_key_label, label
+    );
 
     debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_rw_session(slot)?;
     debug!("Session opened successfully");
-    
+
     let pin = AuthPin::new(user_pin.to_string());
     debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
@@ -49,10 +52,13 @@ pub fn wrap_key(
 
     // Wrap the key using AES Key Wrap (RFC 3394)
     let mechanism = Mechanism::AesKeyWrap;
-    debug!("Using key wrapping mechanism: {}", mechanism_name(&mechanism));
+    debug!(
+        "Using key wrapping mechanism: {}",
+        mechanism_name(&mechanism)
+    );
     debug!("→ Calling C_WrapKey");
     let wrapped_key = session.wrap_key(&mechanism, wrapping_key, key_to_wrap)?;
-    
+
     info!("Key wrapped successfully: {} bytes", wrapped_key.len());
 
     // Write wrapped key to file
@@ -64,7 +70,7 @@ pub fn wrap_key(
     debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Logged out");
-    
+
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     debug!("PKCS#11 library finalized");
@@ -84,19 +90,22 @@ pub fn unwrap_key(
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("PKCS#11 module loaded successfully");
-    
+
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
     debug!("PKCS#11 library initialized");
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Unwrapping key '{}' with wrapping key '{}' on token '{}'", key_label, wrapping_key_label, label);
+    info!(
+        "Unwrapping key '{}' with wrapping key '{}' on token '{}'",
+        key_label, wrapping_key_label, label
+    );
 
     debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_rw_session(slot)?;
     debug!("Session opened successfully");
-    
+
     let pin = AuthPin::new(user_pin.to_string());
     debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
@@ -109,7 +118,11 @@ pub fn unwrap_key(
 
     // Read wrapped key data
     let wrapped_key = fs::read(input_path)?;
-    info!("Read {} bytes of wrapped key data from {}", wrapped_key.len(), input_path);
+    info!(
+        "Read {} bytes of wrapped key data from {}",
+        wrapped_key.len(),
+        input_path
+    );
 
     // Prepare template for the unwrapped key
     let key_template = match key_type.to_lowercase().as_str() {
@@ -128,15 +141,22 @@ pub fn unwrap_key(
                 Attribute::Unwrap(true),
             ]
         }
-        _ => anyhow::bail!("Unsupported key type for unwrap: {}. Currently only 'aes' is supported.", key_type),
+        _ => anyhow::bail!(
+            "Unsupported key type for unwrap: {}. Currently only 'aes' is supported.",
+            key_type
+        ),
     };
 
     // Unwrap the key using AES Key Wrap (RFC 3394)
     let mechanism = Mechanism::AesKeyWrap;
-    debug!("Using key unwrapping mechanism: {}", mechanism_name(&mechanism));
+    debug!(
+        "Using key unwrapping mechanism: {}",
+        mechanism_name(&mechanism)
+    );
     debug!("→ Calling C_UnwrapKey");
-    let unwrapped_key = session.unwrap_key(&mechanism, wrapping_key, &wrapped_key, &key_template)?;
-    
+    let unwrapped_key =
+        session.unwrap_key(&mechanism, wrapping_key, &wrapped_key, &key_template)?;
+
     println!("Key '{}' unwrapped successfully", key_label);
     println!("  Wrapping key: {}", wrapping_key_label);
     println!("  Key handle: {:?}", unwrapped_key);
@@ -145,7 +165,7 @@ pub fn unwrap_key(
     debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Logged out");
-    
+
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     debug!("PKCS#11 library finalized");
@@ -153,17 +173,14 @@ pub fn unwrap_key(
     Ok(())
 }
 
-fn find_key(
-    session: &cryptoki::session::Session,
-    label: &str,
-) -> anyhow::Result<ObjectHandle> {
+fn find_key(session: &cryptoki::session::Session, label: &str) -> anyhow::Result<ObjectHandle> {
     let template = vec![
         Attribute::Label(label.as_bytes().to_vec()),
         Attribute::Class(cryptoki::object::ObjectClass::SECRET_KEY),
     ];
 
     let objects = session.find_objects(&template)?;
-    
+
     if objects.is_empty() {
         anyhow::bail!("Key '{}' not found", label);
     }
@@ -183,9 +200,12 @@ fn find_wrapping_key(
     ];
 
     let objects = session.find_objects(&template)?;
-    
+
     if objects.is_empty() {
-        anyhow::bail!("Wrapping key '{}' not found. Make sure it's an AES key with wrapping capability.", label);
+        anyhow::bail!(
+            "Wrapping key '{}' not found. Make sure it's an AES key with wrapping capability.",
+            label
+        );
     }
 
     Ok(objects[0])

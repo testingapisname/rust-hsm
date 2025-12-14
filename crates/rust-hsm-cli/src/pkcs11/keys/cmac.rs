@@ -25,19 +25,25 @@ pub fn gen_cmac_key(
 
     let pkcs11 = Pkcs11::new(module_path)
         .with_context(|| format!("Failed to load PKCS#11 module: {}", module_path))?;
-    
-    pkcs11.initialize(cryptoki::context::CInitializeArgs::OsThreads)
+
+    pkcs11
+        .initialize(cryptoki::context::CInitializeArgs::OsThreads)
         .context("Failed to initialize PKCS#11 module")?;
 
     let slot_id = find_token_slot(&pkcs11, token_label)?;
 
-    info!("Generating CMAC AES-{} key on token '{}' in slot {}", bits, token_label, slot_id);
+    info!(
+        "Generating CMAC AES-{} key on token '{}' in slot {}",
+        bits, token_label, slot_id
+    );
 
-    let session = pkcs11.open_rw_session(slot_id)
+    let session = pkcs11
+        .open_rw_session(slot_id)
         .context("Failed to open read-write session")?;
-    
+
     let pin = AuthPin::new(user_pin.to_string());
-    session.login(UserType::User, Some(&pin))
+    session
+        .login(UserType::User, Some(&pin))
         .context("Failed to login with user PIN")?;
 
     // AES key attributes for CMAC
@@ -53,12 +59,16 @@ pub fn gen_cmac_key(
 
     let mechanism = Mechanism::AesKeyGen;
 
-    let key_handle = session.generate_key(&mechanism, &key_template)
+    let key_handle = session
+        .generate_key(&mechanism, &key_template)
         .context("Failed to generate CMAC AES key")?;
 
-    println!("CMAC AES-{} key '{}' generated successfully", bits, key_label);
+    println!(
+        "CMAC AES-{} key '{}' generated successfully",
+        bits, key_label
+    );
     println!("  Key handle: {:?}", key_handle);
-    
+
     Ok(())
 }
 
@@ -74,48 +84,61 @@ pub fn cmac_sign(
 ) -> Result<()> {
     let pkcs11 = Pkcs11::new(module_path)
         .with_context(|| format!("Failed to load PKCS#11 module: {}", module_path))?;
-    
-    pkcs11.initialize(cryptoki::context::CInitializeArgs::OsThreads)
+
+    pkcs11
+        .initialize(cryptoki::context::CInitializeArgs::OsThreads)
         .context("Failed to initialize PKCS#11 module")?;
 
     let slot_id = find_token_slot(&pkcs11, token_label)?;
 
-    info!("Computing CMAC for key '{}' on token '{}'", key_label, token_label);
+    info!(
+        "Computing CMAC for key '{}' on token '{}'",
+        key_label, token_label
+    );
 
-    let session = pkcs11.open_rw_session(slot_id)
+    let session = pkcs11
+        .open_rw_session(slot_id)
         .context("Failed to open read-write session")?;
-    
+
     let pin = AuthPin::new(user_pin.to_string());
-    session.login(UserType::User, Some(&pin))
+    session
+        .login(UserType::User, Some(&pin))
         .context("Failed to login with user PIN")?;
 
     // Find the CMAC key (AES key)
-    let key_handles = session.find_objects(&[
-        Attribute::Class(ObjectClass::SECRET_KEY),
-        Attribute::Label(key_label.as_bytes().to_vec()),
-    ])
-    .context("Failed to search for key")?;
+    let key_handles = session
+        .find_objects(&[
+            Attribute::Class(ObjectClass::SECRET_KEY),
+            Attribute::Label(key_label.as_bytes().to_vec()),
+        ])
+        .context("Failed to search for key")?;
 
-    let key_handle = key_handles.first()
+    let key_handle = key_handles
+        .first()
         .ok_or_else(|| anyhow::anyhow!("CMAC key '{}' not found", key_label))?;
 
     // Read input data
     let data = fs::read(input_path)
         .with_context(|| format!("Failed to read input file: {}", input_path.display()))?;
-    
+
     info!("Read {} bytes from {}", data.len(), input_path.display());
 
     // Use AES-CMAC mechanism
     let mechanism = Mechanism::AesCMac;
 
     // Compute CMAC
-    let mut cmac = session.sign(&mechanism, *key_handle, &data)
+    let mut cmac = session
+        .sign(&mechanism, *key_handle, &data)
         .context("Failed to compute CMAC")?;
 
     // Truncate if requested (CMAC full length is 16 bytes for AES)
     if let Some(len) = mac_len {
         if len > cmac.len() {
-            anyhow::bail!("Requested MAC length {} exceeds maximum {} bytes", len, cmac.len());
+            anyhow::bail!(
+                "Requested MAC length {} exceeds maximum {} bytes",
+                len,
+                cmac.len()
+            );
         }
         cmac.truncate(len);
     }
@@ -129,7 +152,7 @@ pub fn cmac_sign(
     println!("CMAC computed successfully");
     println!("  Input: {} ({} bytes)", input_path.display(), data.len());
     println!("  Output: {} ({} bytes)", output_path.display(), cmac.len());
-    
+
     Ok(())
 }
 
@@ -144,50 +167,63 @@ pub fn cmac_verify(
 ) -> Result<()> {
     let pkcs11 = Pkcs11::new(module_path)
         .with_context(|| format!("Failed to load PKCS#11 module: {}", module_path))?;
-    
-    pkcs11.initialize(cryptoki::context::CInitializeArgs::OsThreads)
+
+    pkcs11
+        .initialize(cryptoki::context::CInitializeArgs::OsThreads)
         .context("Failed to initialize PKCS#11 module")?;
 
     let slot_id = find_token_slot(&pkcs11, token_label)?;
 
-    info!("Verifying CMAC for key '{}' on token '{}'", key_label, token_label);
+    info!(
+        "Verifying CMAC for key '{}' on token '{}'",
+        key_label, token_label
+    );
 
-    let session = pkcs11.open_rw_session(slot_id)
+    let session = pkcs11
+        .open_rw_session(slot_id)
         .context("Failed to open read-write session")?;
-    
+
     let pin = AuthPin::new(user_pin.to_string());
-    session.login(UserType::User, Some(&pin))
+    session
+        .login(UserType::User, Some(&pin))
         .context("Failed to login with user PIN")?;
 
     // Find the CMAC key (AES key)
-    let key_handles = session.find_objects(&[
-        Attribute::Class(ObjectClass::SECRET_KEY),
-        Attribute::Label(key_label.as_bytes().to_vec()),
-    ])
-    .context("Failed to search for key")?;
+    let key_handles = session
+        .find_objects(&[
+            Attribute::Class(ObjectClass::SECRET_KEY),
+            Attribute::Label(key_label.as_bytes().to_vec()),
+        ])
+        .context("Failed to search for key")?;
 
-    let key_handle = key_handles.first()
+    let key_handle = key_handles
+        .first()
         .ok_or_else(|| anyhow::anyhow!("CMAC key '{}' not found", key_label))?;
 
     // Read input data and CMAC
     let data = fs::read(input_path)
         .with_context(|| format!("Failed to read input file: {}", input_path.display()))?;
-    
+
     let cmac = fs::read(cmac_path)
         .with_context(|| format!("Failed to read CMAC file: {}", cmac_path.display()))?;
-    
-    info!("Read {} bytes data and {}-byte CMAC", data.len(), cmac.len());
+
+    info!(
+        "Read {} bytes data and {}-byte CMAC",
+        data.len(),
+        cmac.len()
+    );
 
     // Use AES-CMAC mechanism
     let mechanism = Mechanism::AesCMac;
 
     // Verify CMAC
-    session.verify(&mechanism, *key_handle, &data, &cmac)
+    session
+        .verify(&mechanism, *key_handle, &data, &cmac)
         .context("CMAC verification failed")?;
 
     println!("✓ CMAC verification successful");
     println!("  Data: {} ({} bytes)", input_path.display(), data.len());
     println!("  CMAC: {} ({} bytes)", cmac_path.display(), cmac.len());
-    
+
     Ok(())
 }

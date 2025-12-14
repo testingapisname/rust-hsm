@@ -114,14 +114,14 @@ fn test_benchmark_csv_output() {
 
     // Verify CSV structure
     let csv_content = fs::read_to_string(output_path).expect("Failed to read CSV output");
-    
+
     // Check header
     assert!(csv_content.contains("operation,iterations,ops_per_sec"));
-    
+
     // Check at least one data row
     let lines: Vec<&str> = csv_content.lines().collect();
     assert!(lines.len() > 1, "CSV should have header + data rows");
-    
+
     // Verify data format
     let data_line = lines[1];
     let fields: Vec<&str> = data_line.split(',').collect();
@@ -261,16 +261,16 @@ fn test_benchmark_data_sizes_with_comparison() {
     let json_content = fs::read_to_string(baseline_path).expect("Failed to read baseline");
     let json: Value = serde_json::from_str(&json_content).expect("Invalid JSON");
     let results = json["results"].as_array().unwrap();
-    
+
     // Should have standard tests + data size variations
     assert!(results.len() > 14, "Should have standard + data size tests");
-    
+
     // Check for data size test names
     let result_names: Vec<&str> = results
         .iter()
         .map(|r| r["name"].as_str().unwrap())
         .collect();
-    
+
     assert!(result_names.iter().any(|&name| name.contains("(1KB)")));
     assert!(result_names.iter().any(|&name| name.contains("(10KB)")));
     assert!(result_names.iter().any(|&name| name.contains("(100KB)")));
@@ -350,11 +350,11 @@ fn test_json_output_completeness() {
         assert!(result["p50_ms"].is_number());
         assert!(result["p95_ms"].is_number());
         assert!(result["p99_ms"].is_number());
-        
+
         // Sanity checks
         let ops_per_sec = result["ops_per_sec"].as_f64().unwrap();
         assert!(ops_per_sec > 0.0, "ops_per_sec should be positive");
-        
+
         let avg_latency = result["avg_latency_ms"].as_f64().unwrap();
         assert!(avg_latency > 0.0, "avg_latency_ms should be positive");
     }

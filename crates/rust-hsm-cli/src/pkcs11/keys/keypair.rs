@@ -19,7 +19,7 @@ pub fn gen_keypair(
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("PKCS#11 module loaded successfully");
-    
+
     debug!("Initializing PKCS#11 library with OS threads");
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
@@ -27,7 +27,12 @@ pub fn gen_keypair(
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Generating {} keypair on token '{}' in slot {}", key_type, label, usize::from(slot));
+    info!(
+        "Generating {} keypair on token '{}' in slot {}",
+        key_type,
+        label,
+        usize::from(slot)
+    );
     debug!("Token found at slot: {}", usize::from(slot));
 
     let session = pkcs11.open_rw_session(slot)?;
@@ -37,9 +42,12 @@ pub fn gen_keypair(
     match key_type.to_lowercase().as_str() {
         "rsa" => {
             let mechanism = Mechanism::RsaPkcsKeyPairGen;
-            debug!("Using key generation mechanism: {}", mechanism_name(&mechanism));
+            debug!(
+                "Using key generation mechanism: {}",
+                mechanism_name(&mechanism)
+            );
             debug!("Generating RSA-{} keypair", bits);
-            
+
             let public_key_template = vec![
                 Attribute::Token(true),
                 Attribute::Label(key_label.as_bytes().to_vec()),
@@ -59,7 +67,7 @@ pub fn gen_keypair(
                 Attribute::Decrypt(true),
                 Attribute::Sign(true),
             ];
-            
+
             if extractable {
                 private_key_template.push(Attribute::Extractable(true));
             }
@@ -70,14 +78,20 @@ pub fn gen_keypair(
                 &private_key_template,
             )?;
 
-            println!("RSA-{} keypair '{}' generated successfully", bits, key_label);
+            println!(
+                "RSA-{} keypair '{}' generated successfully",
+                bits, key_label
+            );
             println!("  Public key handle: {:?}", public_key);
             println!("  Private key handle: {:?}", private_key);
         }
         "ecdsa" | "ec" | "p256" | "p384" => {
             let mechanism = Mechanism::EccKeyPairGen;
-            debug!("Using key generation mechanism: {}", mechanism_name(&mechanism));
-            
+            debug!(
+                "Using key generation mechanism: {}",
+                mechanism_name(&mechanism)
+            );
+
             // EC parameters: ANSI X9.62 named curves
             let ec_params = match key_type.to_lowercase().as_str() {
                 "p256" | "ec" | "ecdsa" => {
@@ -92,7 +106,7 @@ pub fn gen_keypair(
                     anyhow::bail!("Unsupported EC curve. Use 'p256' or 'p384'");
                 }
             };
-            
+
             let public_key_template = vec![
                 Attribute::Token(true),
                 Attribute::Label(key_label.as_bytes().to_vec()),
@@ -120,7 +134,10 @@ pub fn gen_keypair(
                 "p384" => "P-384",
                 _ => "P-256",
             };
-            println!("ECDSA {} keypair '{}' generated successfully", curve_name, key_label);
+            println!(
+                "ECDSA {} keypair '{}' generated successfully",
+                curve_name, key_label
+            );
             println!("  Public key handle: {:?}", public_key);
             println!("  Private key handle: {:?}", private_key);
         }

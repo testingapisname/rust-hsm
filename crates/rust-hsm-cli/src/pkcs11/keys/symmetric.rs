@@ -19,19 +19,24 @@ pub fn gen_symmetric_key(
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("PKCS#11 module loaded successfully");
-    
+
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
     debug!("PKCS#11 library initialized");
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Generating AES-{} key on token '{}' in slot {}", bits, label, usize::from(slot));
+    info!(
+        "Generating AES-{} key on token '{}' in slot {}",
+        bits,
+        label,
+        usize::from(slot)
+    );
 
     debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_rw_session(slot)?;
     debug!("Session opened successfully");
-    
+
     let pin = AuthPin::new(user_pin.to_string());
     debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
@@ -44,7 +49,10 @@ pub fn gen_symmetric_key(
 
     // Generate AES key
     let mechanism = Mechanism::AesKeyGen;
-    debug!("Using key generation mechanism: {}", mechanism_name(&mechanism));
+    debug!(
+        "Using key generation mechanism: {}",
+        mechanism_name(&mechanism)
+    );
     debug!("→ Calling C_GenerateKey");
     let key_template = vec![
         Attribute::Token(true),
@@ -60,14 +68,14 @@ pub fn gen_symmetric_key(
     ];
 
     let key = session.generate_key(&mechanism, &key_template)?;
-    
+
     println!("AES-{} key '{}' generated successfully", bits, key_label);
     println!("  Key handle: {:?}", key);
 
     debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Logged out");
-    
+
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     debug!("PKCS#11 library finalized");
@@ -86,19 +94,22 @@ pub fn encrypt_symmetric(
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("PKCS#11 module loaded successfully");
-    
+
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
     debug!("PKCS#11 library initialized");
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Encrypting data with AES key '{}' on token '{}'", key_label, label);
+    info!(
+        "Encrypting data with AES key '{}' on token '{}'",
+        key_label, label
+    );
 
     debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_ro_session(slot)?;
     debug!("Session opened successfully");
-    
+
     let pin = AuthPin::new(user_pin.to_string());
     debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
@@ -111,7 +122,7 @@ pub fn encrypt_symmetric(
         Attribute::Class(cryptoki::object::ObjectClass::SECRET_KEY),
     ];
     let objects = session.find_objects(&template)?;
-    
+
     if objects.is_empty() {
         debug!("→ Calling C_Logout, C_Finalize");
         session.logout()?;
@@ -131,27 +142,39 @@ pub fn encrypt_symmetric(
     trace!("Generated IV: {} bytes", iv.len());
 
     // Encrypt using AES-GCM
-    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], (128u64).into())?);
+    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(
+        &mut iv,
+        &[],
+        (128u64).into(),
+    )?);
     debug!("Using encryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_EncryptInit, C_Encrypt");
     let ciphertext = session.encrypt(&mechanism, key, &plaintext)?;
-    
-    info!("Encrypted {} bytes to {} bytes", plaintext.len(), ciphertext.len());
+
+    info!(
+        "Encrypted {} bytes to {} bytes",
+        plaintext.len(),
+        ciphertext.len()
+    );
 
     // Write IV + ciphertext to file (IV is needed for decryption)
     let mut output = Vec::new();
     output.extend_from_slice(&iv);
     output.extend_from_slice(&ciphertext);
     fs::write(output_path, &output)?;
-    
+
     println!("Data encrypted successfully with AES-GCM");
     println!("  Input: {} ({} bytes)", input_path, plaintext.len());
-    println!("  Output: {} ({} bytes, includes 12-byte IV)", output_path, output.len());
+    println!(
+        "  Output: {} ({} bytes, includes 12-byte IV)",
+        output_path,
+        output.len()
+    );
 
     debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Logged out");
-    
+
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     debug!("PKCS#11 library finalized");
@@ -170,19 +193,22 @@ pub fn decrypt_symmetric(
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("PKCS#11 module loaded successfully");
-    
+
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
     debug!("PKCS#11 library initialized");
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Decrypting data with AES key '{}' on token '{}'", key_label, label);
+    info!(
+        "Decrypting data with AES key '{}' on token '{}'",
+        key_label, label
+    );
 
     debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_ro_session(slot)?;
     debug!("Session opened successfully");
-    
+
     let pin = AuthPin::new(user_pin.to_string());
     debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
@@ -195,7 +221,7 @@ pub fn decrypt_symmetric(
         Attribute::Class(cryptoki::object::ObjectClass::SECRET_KEY),
     ];
     let objects = session.find_objects(&template)?;
-    
+
     if objects.is_empty() {
         debug!("→ Calling C_Logout, C_Finalize");
         session.logout()?;
@@ -217,15 +243,27 @@ pub fn decrypt_symmetric(
     // Extract IV (first 12 bytes) and ciphertext (remaining bytes)
     let mut iv = data[..12].to_vec();
     let ciphertext = &data[12..];
-    trace!("Extracted IV: {} bytes, ciphertext: {} bytes", iv.len(), ciphertext.len());
+    trace!(
+        "Extracted IV: {} bytes, ciphertext: {} bytes",
+        iv.len(),
+        ciphertext.len()
+    );
 
     // Decrypt using AES-GCM
-    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(&mut iv, &[], (128u64).into())?);
+    let mechanism = Mechanism::AesGcm(cryptoki::mechanism::aead::GcmParams::new(
+        &mut iv,
+        &[],
+        (128u64).into(),
+    )?);
     debug!("Using decryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_DecryptInit, C_Decrypt");
     let plaintext = session.decrypt(&mechanism, key, ciphertext)?;
-    
-    info!("Decrypted {} bytes to {} bytes", ciphertext.len(), plaintext.len());
+
+    info!(
+        "Decrypted {} bytes to {} bytes",
+        ciphertext.len(),
+        plaintext.len()
+    );
 
     // Write plaintext to file
     fs::write(output_path, &plaintext)?;
@@ -236,7 +274,7 @@ pub fn decrypt_symmetric(
     debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Logged out");
-    
+
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     debug!("PKCS#11 library finalized");

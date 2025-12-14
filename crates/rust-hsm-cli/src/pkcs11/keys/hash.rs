@@ -17,27 +17,31 @@ pub fn hash_data(
 ) -> Result<()> {
     let pkcs11 = Pkcs11::new(module_path)
         .with_context(|| format!("Failed to load PKCS#11 module: {}", module_path))?;
-    
-    pkcs11.initialize(cryptoki::context::CInitializeArgs::OsThreads)
+
+    pkcs11
+        .initialize(cryptoki::context::CInitializeArgs::OsThreads)
         .context("Failed to initialize PKCS#11 module")?;
 
     // Use the first available slot for hashing (doesn't require a specific token)
-    let slots = pkcs11.get_slots_with_initialized_token()
+    let slots = pkcs11
+        .get_slots_with_initialized_token()
         .context("Failed to get slots")?;
-    
-    let slot_id = slots.first()
+
+    let slot_id = slots
+        .first()
         .ok_or_else(|| anyhow::anyhow!("No initialized tokens found"))?;
 
     info!("Hashing data with {}", algorithm);
 
     // Open read-only session (no login needed for hashing)
-    let session = pkcs11.open_ro_session(*slot_id)
+    let session = pkcs11
+        .open_ro_session(*slot_id)
         .context("Failed to open read-only session")?;
 
     // Read input data
     let data = fs::read(input_path)
         .with_context(|| format!("Failed to read input file: {}", input_path.display()))?;
-    
+
     info!("Read {} bytes from {}", data.len(), input_path.display());
 
     // Select hash mechanism
@@ -46,11 +50,15 @@ pub fn hash_data(
         "sha512" | "sha-512" => Mechanism::Sha512,
         "sha224" | "sha-224" => Mechanism::Sha224,
         "sha1" | "sha-1" => Mechanism::Sha1,
-        _ => anyhow::bail!("Unsupported hash algorithm: {}. Supported: sha256, sha512, sha224, sha1", algorithm),
+        _ => anyhow::bail!(
+            "Unsupported hash algorithm: {}. Supported: sha256, sha512, sha224, sha1",
+            algorithm
+        ),
     };
 
     // Hash the data
-    let hash = session.digest(&mechanism, &data)
+    let hash = session
+        .digest(&mechanism, &data)
         .context("Failed to hash data")?;
 
     info!("Generated {}-byte hash", hash.len());
@@ -62,7 +70,7 @@ pub fn hash_data(
     println!("Data hashed successfully with {}", algorithm.to_uppercase());
     println!("  Input: {} ({} bytes)", input_path.display(), data.len());
     println!("  Output: {} ({} bytes)", output_path.display(), hash.len());
-    
+
     Ok(())
 }
 

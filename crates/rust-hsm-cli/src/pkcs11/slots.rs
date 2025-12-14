@@ -14,7 +14,7 @@ pub fn list_slots(module_path: &str) -> anyhow::Result<()> {
     let slots = pkcs11.get_slots_with_initialized_token()?;
     debug!("Found {} initialized slots", slots.len());
     trace!("Initialized slots: {:?}", slots);
-    
+
     println!("\n=== Initialized Slots ===");
     if slots.is_empty() {
         println!("No initialized tokens found.");
@@ -29,7 +29,7 @@ pub fn list_slots(module_path: &str) -> anyhow::Result<()> {
     let all_slots = pkcs11.get_all_slots()?;
     debug!("Found {} total slots", all_slots.len());
     trace!("All slots: {:?}", all_slots);
-    
+
     println!("\n=== All Slots ===");
     for slot in &all_slots {
         print_slot_info(&pkcs11, *slot)?;
@@ -38,7 +38,7 @@ pub fn list_slots(module_path: &str) -> anyhow::Result<()> {
     debug!("Finalizing PKCS#11 library");
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
-    
+
     Ok(())
 }
 
@@ -47,11 +47,11 @@ fn print_slot_info(pkcs11: &Pkcs11, slot: Slot) -> anyhow::Result<()> {
     debug!("→ Calling C_GetSlotInfo");
     let slot_info = pkcs11.get_slot_info(slot)?;
     trace!("Slot info: {:?}", slot_info);
-    
+
     println!("\nSlot {}", usize::from(slot));
     println!("  Description: {}", slot_info.slot_description());
     println!("  Manufacturer: {}", slot_info.manufacturer_id());
-    
+
     // Check if token is present by trying to get token info
     debug!("Retrieving token info for slot {}", usize::from(slot));
     debug!("→ Calling C_GetTokenInfo");
@@ -68,7 +68,7 @@ fn print_slot_info(pkcs11: &Pkcs11, slot: Slot) -> anyhow::Result<()> {
             println!("  Token: Error reading token info: {}", e);
         }
     }
-    
+
     Ok(())
 }
 
@@ -76,8 +76,9 @@ fn print_slot_info(pkcs11: &Pkcs11, slot: Slot) -> anyhow::Result<()> {
 pub fn find_first_slot(pkcs11: &Pkcs11) -> anyhow::Result<Slot> {
     debug!("Finding first available slot");
     let slots = pkcs11.get_all_slots()?;
-    
-    slots.first()
+
+    slots
+        .first()
         .copied()
         .ok_or_else(|| anyhow::anyhow!("No slots available"))
 }

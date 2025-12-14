@@ -1,11 +1,16 @@
 use cryptoki::context::{CInitializeArgs, Pkcs11};
-use cryptoki::object::{Attribute, AttributeType, ObjectClass, KeyType};
+use cryptoki::object::{Attribute, AttributeType, KeyType, ObjectClass};
 use cryptoki::session::UserType;
 use cryptoki::slot::Slot;
 use cryptoki::types::AuthPin;
-use tracing::{info, debug, trace};
+use tracing::{debug, info, trace};
 
-pub fn list_objects(module_path: &str, label: &str, user_pin: &str, detailed: bool) -> anyhow::Result<()> {
+pub fn list_objects(
+    module_path: &str,
+    label: &str,
+    user_pin: &str,
+    detailed: bool,
+) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("Initializing PKCS#11 library");
@@ -16,29 +21,29 @@ pub fn list_objects(module_path: &str, label: &str, user_pin: &str, detailed: bo
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
     debug!("Token found at slot: {}", usize::from(slot));
-    
+
     info!("Opening session on slot {}", usize::from(slot));
     debug!("Opening read-only session");
     debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_ro_session(slot)?;
     debug!("Session opened successfully");
-    
+
     // Login as user
     let pin = AuthPin::new(user_pin.to_string());
     debug!("Logging in as User");
     debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
     debug!("User login successful");
-    
+
     println!("\n=== Objects on token '{}' ===", label);
-    
+
     // Find all objects
     debug!("Searching for all objects (empty template)");
     debug!("→ Calling C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal");
     let objects = session.find_objects(&[])?;
     debug!("Found {} objects", objects.len());
     trace!("Object handles: {:?}", objects);
-    
+
     if objects.is_empty() {
         println!("No objects found.");
     } else {
@@ -54,14 +59,17 @@ pub fn list_objects(module_path: &str, label: &str, user_pin: &str, detailed: bo
             for (idx, obj) in objects.iter().enumerate() {
                 debug!("Retrieving attributes for object {}: {:?}", idx + 1, obj);
                 println!("\nObject {}:", idx + 1);
-                
+
                 // Try to get common attributes
                 debug!("→ Calling C_GetAttributeValue");
-                if let Ok(attrs) = session.get_attributes(*obj, &[
-                    AttributeType::Label,
-                    AttributeType::Class,
-                    AttributeType::Id,
-                ]) {
+                if let Ok(attrs) = session.get_attributes(
+                    *obj,
+                    &[
+                        AttributeType::Label,
+                        AttributeType::Class,
+                        AttributeType::Id,
+                    ],
+                ) {
                     trace!("Retrieved {} attributes", attrs.len());
                     for attr in attrs {
                         match attr {
@@ -85,49 +93,57 @@ pub fn list_objects(module_path: &str, label: &str, user_pin: &str, detailed: bo
             }
         }
     }
-    
+
     debug!("Logging out from session");
     debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Finalizing PKCS#11 library");
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
-    
+
     Ok(())
 }
 
-fn get_detailed_object_info(session: &cryptoki::session::Session, obj: cryptoki::object::ObjectHandle) -> Option<String> {
+fn get_detailed_object_info(
+    session: &cryptoki::session::Session,
+    obj: cryptoki::object::ObjectHandle,
+) -> Option<String> {
     // Get all the attributes we might need
-    let attrs = session.get_attributes(obj, &[
-        AttributeType::Label,
-        AttributeType::Class,
-        AttributeType::KeyType,
-        AttributeType::Token,
-        AttributeType::Private,
-        AttributeType::Modifiable,
-        AttributeType::Local,
-        AttributeType::Sensitive,
-        AttributeType::AlwaysSensitive,
-        AttributeType::NeverExtractable,
-        AttributeType::Extractable,
-        AttributeType::Sign,
-        AttributeType::Verify,
-        AttributeType::Encrypt,
-        AttributeType::Decrypt,
-        AttributeType::Wrap,
-        AttributeType::Unwrap,
-        AttributeType::Derive,
-        AttributeType::ModulusBits,
-        AttributeType::ValueLen,
-    ]).ok()?;
-    
+    let attrs = session
+        .get_attributes(
+            obj,
+            &[
+                AttributeType::Label,
+                AttributeType::Class,
+                AttributeType::KeyType,
+                AttributeType::Token,
+                AttributeType::Private,
+                AttributeType::Modifiable,
+                AttributeType::Local,
+                AttributeType::Sensitive,
+                AttributeType::AlwaysSensitive,
+                AttributeType::NeverExtractable,
+                AttributeType::Extractable,
+                AttributeType::Sign,
+                AttributeType::Verify,
+                AttributeType::Encrypt,
+                AttributeType::Decrypt,
+                AttributeType::Wrap,
+                AttributeType::Unwrap,
+                AttributeType::Derive,
+                AttributeType::ModulusBits,
+                AttributeType::ValueLen,
+            ],
+        )
+        .ok()?;
+
     // Extract values
     let mut label = String::new();
     let mut class_str = String::new();
     let mut key_type_str = String::new();
     let mut flags = Vec::new();
     let mut key_size = None;
-    
+
     for attr in attrs {
         match attr {
             Attribute::Label(bytes) => {
@@ -155,49 +171,85 @@ fn get_detailed_object_info(session: &cryptoki::session::Session, obj: cryptoki:
                 };
             }
             Attribute::Token(val) => {
-                if val { flags.push("tok"); }
+                if val {
+                    flags.push("tok");
+                }
             }
             Attribute::Private(val) => {
-                if val { flags.push("prv"); } else { flags.push("pub"); }
+                if val {
+                    flags.push("prv");
+                } else {
+                    flags.push("pub");
+                }
             }
             Attribute::Modifiable(val) => {
-                if val { flags.push("r/w"); } else { flags.push("r/o"); }
+                if val {
+                    flags.push("r/w");
+                } else {
+                    flags.push("r/o");
+                }
             }
             Attribute::Local(val) => {
-                if val { flags.push("loc"); } else { flags.push("imp"); }
+                if val {
+                    flags.push("loc");
+                } else {
+                    flags.push("imp");
+                }
             }
             Attribute::Sign(val) => {
-                if val { flags.push("sig"); }
+                if val {
+                    flags.push("sig");
+                }
             }
             Attribute::Verify(val) => {
-                if val { flags.push("vfy"); }
+                if val {
+                    flags.push("vfy");
+                }
             }
             Attribute::Encrypt(val) => {
-                if val { flags.push("enc"); }
+                if val {
+                    flags.push("enc");
+                }
             }
             Attribute::Decrypt(val) => {
-                if val { flags.push("dec"); }
+                if val {
+                    flags.push("dec");
+                }
             }
             Attribute::Wrap(val) => {
-                if val { flags.push("wra"); }
+                if val {
+                    flags.push("wra");
+                }
             }
             Attribute::Unwrap(val) => {
-                if val { flags.push("unw"); }
+                if val {
+                    flags.push("unw");
+                }
             }
             Attribute::Derive(val) => {
-                if val { flags.push("der"); }
+                if val {
+                    flags.push("der");
+                }
             }
             Attribute::Sensitive(val) => {
-                if val { flags.push("sen"); }
+                if val {
+                    flags.push("sen");
+                }
             }
             Attribute::AlwaysSensitive(val) => {
-                if val { flags.push("ase"); }
+                if val {
+                    flags.push("ase");
+                }
             }
             Attribute::NeverExtractable(val) => {
-                if val { flags.push("nxt"); }
+                if val {
+                    flags.push("nxt");
+                }
             }
             Attribute::Extractable(val) => {
-                if !val { flags.push("XTR"); }
+                if !val {
+                    flags.push("XTR");
+                }
             }
             Attribute::ModulusBits(bits) => {
                 key_size = Some(usize::from(bits));
@@ -210,28 +262,31 @@ fn get_detailed_object_info(session: &cryptoki::session::Session, obj: cryptoki:
             _ => {}
         }
     }
-    
+
     // Format like p11ls: "prvk/rsa  label                             tok,prv,r/w,loc,sig,sen,ase,nxt,rsa(2048)"
     let type_label = if key_type_str.is_empty() {
         class_str.clone()
     } else {
         format!("{}/{}", class_str, key_type_str)
     };
-    
+
     let flags_str = flags.join(",");
-    
+
     let key_info = if let Some(size) = key_size {
         format!(",{}({})", key_type_str, size)
     } else {
         String::new()
     };
-    
-    Some(format!("{:<10} {:<40} {}{}", type_label, label, flags_str, key_info))
+
+    Some(format!(
+        "{:<10} {:<40} {}{}",
+        type_label, label, flags_str, key_info
+    ))
 }
 
 fn find_token_slot(pkcs11: &Pkcs11, label: &str) -> anyhow::Result<Slot> {
     let slots = pkcs11.get_slots_with_initialized_token()?;
-    
+
     for slot in slots {
         if let Ok(token_info) = pkcs11.get_token_info(slot) {
             if token_info.label().trim() == label {
@@ -239,6 +294,6 @@ fn find_token_slot(pkcs11: &Pkcs11, label: &str) -> anyhow::Result<Slot> {
             }
         }
     }
-    
+
     anyhow::bail!("Token '{}' not found", label)
 }

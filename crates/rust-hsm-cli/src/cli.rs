@@ -8,7 +8,7 @@ pub struct Cli {
     /// Path to configuration file (optional)
     #[arg(long, global = true)]
     pub config: Option<PathBuf>,
-    
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -17,10 +17,10 @@ pub struct Cli {
 pub enum Commands {
     /// Display PKCS#11 module and token information
     Info,
-    
+
     /// List all available slots and tokens
     ListSlots,
-    
+
     /// List supported mechanisms for a slot
     ListMechanisms {
         /// Slot ID (uses first slot if not specified)
@@ -30,7 +30,7 @@ pub enum Commands {
         #[arg(long)]
         detailed: bool,
     },
-    
+
     /// Initialize a token
     InitToken {
         /// Token label (uses config default if not specified)
@@ -42,7 +42,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Initialize user PIN on a token
     InitPin {
         /// Token label (uses config default if not specified)
@@ -59,7 +59,7 @@ pub enum Commands {
         #[arg(long = "user-pin-stdin")]
         user_pin_stdin: bool,
     },
-    
+
     /// Delete a token (reinitializes the slot, erasing all data)
     DeleteToken {
         /// Token label (uses config default if not specified)
@@ -71,7 +71,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// List objects on a token
     ListObjects {
         /// Token label (uses config default if not specified)
@@ -86,7 +86,7 @@ pub enum Commands {
         #[arg(long)]
         detailed: bool,
     },
-    
+
     /// Generate a keypair on the token
     GenKeypair {
         /// Token label (uses config default if not specified)
@@ -107,7 +107,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Sign data with a private key
     Sign {
         /// Token label (uses config default if not specified)
@@ -125,7 +125,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Verify a signature
     Verify {
         /// Token label (uses config default if not specified)
@@ -143,7 +143,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Export a public key in PEM format
     ExportPubkey {
         /// Token label (uses config default if not specified)
@@ -159,7 +159,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Delete a keypair from the token
     DeleteKey {
         /// Token label (uses config default if not specified)
@@ -173,7 +173,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Inspect detailed key attributes (CKA_* values)
     InspectKey {
         /// Token label (uses config default if not specified)
@@ -190,7 +190,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Encrypt data with an RSA public key
     Encrypt {
         /// Token label (uses config default if not specified)
@@ -208,7 +208,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Decrypt data with an RSA private key
     Decrypt {
         /// Token label (uses config default if not specified)
@@ -226,7 +226,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Generate a symmetric key (AES) on the token
     GenSymmetricKey {
         /// Token label (uses config default if not specified)
@@ -246,7 +246,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Encrypt data with AES-GCM
     EncryptSymmetric {
         /// Token label (uses config default if not specified)
@@ -264,7 +264,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Decrypt data with AES-GCM
     DecryptSymmetric {
         /// Token label (uses config default if not specified)
@@ -282,7 +282,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Wrap (export) a key using AES Key Wrap
     WrapKey {
         /// Token label (uses config default if not specified)
@@ -303,7 +303,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Unwrap (import) a key using AES Key Wrap
     UnwrapKey {
         /// Token label (uses config default if not specified)
@@ -327,7 +327,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Generate a Certificate Signing Request (CSR) for a keypair
     GenCsr {
         /// Token label (uses config default if not specified)
@@ -348,7 +348,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Hash data using SHA-256, SHA-512, or other hash algorithms
     Hash {
         /// Hash algorithm (sha256, sha512, sha224, sha1)
@@ -361,7 +361,7 @@ pub enum Commands {
         #[arg(long)]
         output: String,
     },
-    
+
     /// Generate an HMAC key
     GenHmacKey {
         /// Token label (uses config default if not specified)
@@ -378,7 +378,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Compute HMAC for data (message authentication)
     HmacSign {
         /// Token label (uses config default if not specified)
@@ -401,7 +401,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Verify HMAC for data
     HmacVerify {
         /// Token label (uses config default if not specified)
@@ -424,7 +424,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Generate an AES-CMAC key
     GenCmacKey {
         /// Token label (uses config default if not specified)
@@ -441,7 +441,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Compute CMAC for data (AES-based message authentication)
     CmacSign {
         /// Token label (uses config default if not specified)
@@ -464,7 +464,7 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
-    
+
     /// Verify CMAC for data
     CmacVerify {
         /// Token label (uses config default if not specified)

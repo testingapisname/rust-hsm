@@ -47,18 +47,26 @@ pub fn sign(
     debug!("Reading input data from: {}", input_path);
     let data = fs::read(input_path)?;
     info!("Read {} bytes from {}", data.len(), input_path);
-    trace!("Input data (first 32 bytes): {:02x?}", &data[..data.len().min(32)]);
+    trace!(
+        "Input data (first 32 bytes): {:02x?}",
+        &data[..data.len().min(32)]
+    );
 
     // Select appropriate signing mechanism
     let mechanism = match key_type {
         cryptoki::object::KeyType::RSA => Mechanism::Sha256RsaPkcs,
         cryptoki::object::KeyType::EC => Mechanism::Ecdsa,
         _ => anyhow::bail!("Unsupported key type for signing: {:?}", key_type),
-    };    debug!("Using verification mechanism: {}", mechanism_name(&mechanism));    debug!("Using signing mechanism: {}", mechanism_name(&mechanism));
+    };
+    debug!(
+        "Using verification mechanism: {}",
+        mechanism_name(&mechanism)
+    );
+    debug!("Using signing mechanism: {}", mechanism_name(&mechanism));
 
     let signature = if key_type == cryptoki::object::KeyType::EC {
         // For ECDSA, we hash the data first
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(&data);
         let hash = hasher.finalize();
@@ -70,7 +78,7 @@ pub fn sign(
 
     // Write signature
     fs::write(output_path, &signature)?;
-    
+
     println!("Signature created successfully");
     println!("  Input: {} ({} bytes)", input_path, data.len());
     println!("  Signature: {} ({} bytes)", output_path, signature.len());
@@ -97,7 +105,10 @@ pub fn verify(
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Verifying signature with key '{}' on token '{}'", key_label, label);
+    info!(
+        "Verifying signature with key '{}' on token '{}'",
+        key_label, label
+    );
     debug!("Token found at slot: {}", usize::from(slot));
 
     debug!("Opening read-write session");
@@ -118,9 +129,19 @@ pub fn verify(
     let data = fs::read(input_path)?;
     debug!("Reading signature from: {}", signature_path);
     let signature = fs::read(signature_path)?;
-    info!("Read {} bytes of data and {} bytes of signature", data.len(), signature.len());
-    trace!("Input data (first 32 bytes): {:02x?}", &data[..data.len().min(32)]);
-    trace!("Signature (first 32 bytes): {:02x?}", &signature[..signature.len().min(32)]);
+    info!(
+        "Read {} bytes of data and {} bytes of signature",
+        data.len(),
+        signature.len()
+    );
+    trace!(
+        "Input data (first 32 bytes): {:02x?}",
+        &data[..data.len().min(32)]
+    );
+    trace!(
+        "Signature (first 32 bytes): {:02x?}",
+        &signature[..signature.len().min(32)]
+    );
 
     // Determine key type and select appropriate mechanism
     debug!("Querying key type from key handle");
@@ -136,7 +157,7 @@ pub fn verify(
     // For ECDSA, we need to hash the data first
     let verify_result = if key_type == cryptoki::object::KeyType::EC {
         debug!("ECDSA detected: computing SHA-256 hash of input data");
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(&data);
         let hash = hasher.finalize();
@@ -159,7 +180,11 @@ pub fn verify(
             debug!("PKCS#11 verify operation succeeded");
             println!("✓ Signature verification successful");
             println!("  Input: {} ({} bytes)", input_path, data.len());
-            println!("  Signature: {} ({} bytes)", signature_path, signature.len());
+            println!(
+                "  Signature: {} ({} bytes)",
+                signature_path,
+                signature.len()
+            );
             println!("  Key type: {:?}", key_type);
         }
         Err(e) => {
@@ -186,19 +211,22 @@ pub fn encrypt(
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("PKCS#11 module loaded successfully");
-    
+
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
     debug!("PKCS#11 library initialized");
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Encrypting data with key '{}' on token '{}'", key_label, label);
+    info!(
+        "Encrypting data with key '{}' on token '{}'",
+        key_label, label
+    );
 
     debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_ro_session(slot)?;
     debug!("Session opened successfully");
-    
+
     let pin = AuthPin::new(user_pin.to_string());
     debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
@@ -211,7 +239,7 @@ pub fn encrypt(
         Attribute::Class(cryptoki::object::ObjectClass::PUBLIC_KEY),
     ];
     let objects = session.find_objects(&template)?;
-    
+
     if objects.is_empty() {
         debug!("→ Calling C_Logout, C_Finalize");
         session.logout()?;
@@ -225,7 +253,7 @@ pub fn encrypt(
     // Read input data
     let plaintext = fs::read(input_path)?;
     info!("Read {} bytes from {}", plaintext.len(), input_path);
-    
+
     // RSA can only encrypt data up to key_size - padding_overhead
     // For PKCS#1 v1.5, overhead is 11 bytes
     // So max plaintext for 2048-bit key is 245 bytes, for 4096-bit is 501 bytes
@@ -238,8 +266,12 @@ pub fn encrypt(
     debug!("Using encryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_EncryptInit, C_Encrypt");
     let ciphertext = session.encrypt(&mechanism, public_key, &plaintext)?;
-    
-    info!("Encrypted {} bytes to {} bytes", plaintext.len(), ciphertext.len());
+
+    info!(
+        "Encrypted {} bytes to {} bytes",
+        plaintext.len(),
+        ciphertext.len()
+    );
 
     // Write ciphertext to file
     fs::write(output_path, &ciphertext)?;
@@ -250,7 +282,7 @@ pub fn encrypt(
     debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Logged out");
-    
+
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     debug!("PKCS#11 library finalized");
@@ -269,19 +301,22 @@ pub fn decrypt(
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
     debug!("PKCS#11 module loaded successfully");
-    
+
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
     debug!("PKCS#11 library initialized");
 
     debug!("Finding token slot for label: {}", label);
     let slot = find_token_slot(&pkcs11, label)?;
-    info!("Decrypting data with key '{}' on token '{}'", key_label, label);
+    info!(
+        "Decrypting data with key '{}' on token '{}'",
+        key_label, label
+    );
 
     debug!("→ Calling C_OpenSession");
     let session = pkcs11.open_ro_session(slot)?;
     debug!("Session opened successfully");
-    
+
     let pin = AuthPin::new(user_pin.to_string());
     debug!("→ Calling C_Login");
     session.login(UserType::User, Some(&pin))?;
@@ -294,7 +329,7 @@ pub fn decrypt(
         Attribute::Class(cryptoki::object::ObjectClass::PRIVATE_KEY),
     ];
     let objects = session.find_objects(&template)?;
-    
+
     if objects.is_empty() {
         debug!("→ Calling C_Logout, C_Finalize");
         session.logout()?;
@@ -314,8 +349,12 @@ pub fn decrypt(
     debug!("Using decryption mechanism: {}", mechanism_name(&mechanism));
     debug!("→ Calling C_DecryptInit, C_Decrypt");
     let plaintext = session.decrypt(&mechanism, private_key, &ciphertext)?;
-    
-    info!("Decrypted {} bytes to {} bytes", ciphertext.len(), plaintext.len());
+
+    info!(
+        "Decrypted {} bytes to {} bytes",
+        ciphertext.len(),
+        plaintext.len()
+    );
 
     // Write plaintext to file
     fs::write(output_path, &plaintext)?;
@@ -326,7 +365,7 @@ pub fn decrypt(
     debug!("→ Calling C_Logout");
     session.logout()?;
     debug!("Logged out");
-    
+
     debug!("→ Calling C_Finalize");
     pkcs11.finalize();
     debug!("PKCS#11 library finalized");
@@ -349,7 +388,7 @@ fn find_key_by_label(
     ];
 
     let objects = session.find_objects(&template)?;
-    
+
     if objects.is_empty() {
         anyhow::bail!("Key '{}' not found", key_label);
     }

@@ -1,11 +1,11 @@
 pub mod audit;
+pub mod benchmark;
 pub mod errors;
 pub mod info;
 pub mod keys;
 pub mod mechanisms;
 pub mod objects;
+pub mod random;
 pub mod slots;
 pub mod token;
-pub mod random;
-pub mod benchmark;
 pub mod troubleshoot;
