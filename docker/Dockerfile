@@ -11,9 +11,6 @@ COPY Cargo.toml ./
 COPY crates/rust-hsm-core/Cargo.toml crates/rust-hsm-core/Cargo.toml
 COPY crates/rust-hsm-cli/Cargo.toml crates/rust-hsm-cli/Cargo.toml
 
-# Generate lockfile
-RUN cargo generate-lockfile
-
 # Create dummy files to build dependencies
 RUN mkdir -p crates/rust-hsm-core/src && \
     echo "pub fn dummy() {}" > crates/rust-hsm-core/src/lib.rs && \
