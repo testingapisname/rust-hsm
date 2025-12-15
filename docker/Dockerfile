@@ -25,6 +25,9 @@ RUN mkdir -p crates/rust-hsm-core/src/keys && \
 # Copy real source and build actual binaries
 COPY crates/rust-hsm-core/src crates/rust-hsm-core/src
 COPY crates/rust-hsm-cli/src crates/rust-hsm-cli/src
+# Force rebuild by touching source files
+RUN find crates/rust-hsm-core/src -name "*.rs" -exec touch {} + && \
+    find crates/rust-hsm-cli/src -name "*.rs" -exec touch {} +
 RUN cargo build --release --bin rust-hsm-cli
 
 # Run tests
