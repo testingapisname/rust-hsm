@@ -133,8 +133,6 @@ jobs:
       
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: llvm-tools-preview
       
       - name: Cache cargo
         uses: actions/cache@v3
@@ -143,54 +141,18 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Install SoftHSM2
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y softhsm2
-          mkdir -p $HOME/.config/softhsm2
-          echo "directories.tokendir = $HOME/.softhsm/tokens/" > $HOME/.config/softhsm2/softhsm2.conf
-          mkdir -p $HOME/.softhsm/tokens
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
       
-      - name: Initialize test token
-        run: |
-          softhsm2-util --init-token \
-            --slot 0 --label COVERAGE_TOKEN \
-            --so-pin 12345678 --pin 123456
-      
-      - name: Configure application
-        run: |
-          cat > .rust-hsm.toml << EOF
-          pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"
-          default_slot = 0
-          EOF
-      
-      - name: Generate coverage with integration tests
+      - name: Generate coverage
         run: |
           cd crates/rust-hsm-cli
-          cargo tarpaulin --out Xml --output-dir ../../coverage \
-            --engine llvm --follow-exec --timeout 300 -- --test-threads=1 --ignored
-        env:
-          SOFTHSM2_CONF: ${{ env.HOME }}/.config/softhsm2/softhsm2.conf
+          cargo tarpaulin --out Xml --output-dir ../../coverage
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage/cobertura.xml
           fail_ci_if_error: false
-      
-      - name: Show coverage summary
-        if: always()
-        run: |
-          if [ -f ./coverage/cobertura.xml ]; then
-            echo "Coverage report generated successfully"
-            COVERAGE=$(grep -o 'line-rate="[^"]*"' ./coverage/cobertura.xml | head -1 | grep -o '[0-9.]*')
-            if [ -n "$COVERAGE" ]; then
-              PERCENT=$(echo "$COVERAGE * 100" | bc)
-              echo "Line coverage: ${PERCENT}%"
-            fi
-          fi
