@@ -45,8 +45,8 @@ RUN apt-get update && \
         jq && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy Rust binary from builder
-COPY --from=builder /build/crates/rust-hsm-cli/target/release/rust-hsm-cli /usr/local/bin/rust-hsm-cli
+# Copy Rust binary from builder (built from workspace root)
+COPY --from=builder /build/target/release/rust-hsm-cli /usr/local/bin/rust-hsm-cli
 
 # Copy SoftHSM configuration and entrypoint
 COPY docker/softhsm2.conf /etc/softhsm2.conf
