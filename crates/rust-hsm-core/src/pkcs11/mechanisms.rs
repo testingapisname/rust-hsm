@@ -1,6 +1,5 @@
 /// PKCS#11 mechanism type constants and lookup
 /// Based on PKCS#11 v2.40 specification
-
 /// Get human-readable name for a mechanism type value
 pub fn mechanism_name(val: u64) -> Option<&'static str> {
     match val {

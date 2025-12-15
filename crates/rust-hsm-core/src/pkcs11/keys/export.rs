@@ -84,7 +84,7 @@ pub fn export_pubkey(
 
     // Write PEM to file
     fs::write(output_path, &pem_content)?;
-    
+
     if json {
         let json_output = serde_json::json!({
             "status": "success",

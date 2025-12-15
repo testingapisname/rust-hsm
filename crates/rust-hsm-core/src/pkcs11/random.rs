@@ -49,7 +49,7 @@ pub fn generate_random(
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect::<String>();
-    
+
     if let Some(output_path) = output {
         if hex {
             // Write as hex string

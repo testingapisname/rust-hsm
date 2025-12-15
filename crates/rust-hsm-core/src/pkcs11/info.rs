@@ -1,7 +1,7 @@
 use super::mechanisms;
 use cryptoki::context::{CInitializeArgs, Pkcs11};
 use cryptoki::mechanism::MechanismInfo;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tracing::{debug, trace};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -128,8 +128,10 @@ pub fn list_mechanisms(
                 let category = mechanisms::mechanism_category(val).to_string();
 
                 let capabilities = if detailed {
-                    pkcs11.get_mechanism_info(*target_slot, *mech).ok().map(|info| {
-                        MechanismCapabilities {
+                    pkcs11
+                        .get_mechanism_info(*target_slot, *mech)
+                        .ok()
+                        .map(|info| MechanismCapabilities {
                             encrypt: info.encrypt(),
                             decrypt: info.decrypt(),
                             digest: info.digest(),
@@ -142,8 +144,7 @@ pub fn list_mechanisms(
                             wrap: info.wrap(),
                             unwrap: info.unwrap(),
                             derive: info.derive(),
-                        }
-                    })
+                        })
                 } else {
                     None
                 };

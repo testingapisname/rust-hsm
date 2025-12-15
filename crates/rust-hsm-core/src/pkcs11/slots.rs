@@ -1,6 +1,6 @@
 use cryptoki::context::{CInitializeArgs, Pkcs11};
 use cryptoki::slot::Slot;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tracing::{debug, trace};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -133,13 +133,16 @@ pub fn find_first_slot(pkcs11: &Pkcs11) -> anyhow::Result<Slot> {
 
 fn extract_slot_info(pkcs11: &Pkcs11, slot: Slot) -> Option<SlotInfo> {
     let slot_info = pkcs11.get_slot_info(slot).ok()?;
-    
-    let token = pkcs11.get_token_info(slot).ok().map(|token_info| TokenInfo {
-        label: token_info.label().trim().to_string(),
-        manufacturer: token_info.manufacturer_id().trim().to_string(),
-        model: token_info.model().trim().to_string(),
-        serial_number: token_info.serial_number().trim().to_string(),
-    });
+
+    let token = pkcs11
+        .get_token_info(slot)
+        .ok()
+        .map(|token_info| TokenInfo {
+            label: token_info.label().trim().to_string(),
+            manufacturer: token_info.manufacturer_id().trim().to_string(),
+            model: token_info.model().trim().to_string(),
+            serial_number: token_info.serial_number().trim().to_string(),
+        });
 
     Some(SlotInfo {
         slot_id: usize::from(slot),

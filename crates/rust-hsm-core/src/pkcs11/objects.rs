@@ -3,7 +3,7 @@ use cryptoki::object::{Attribute, AttributeType, KeyType, ObjectClass};
 use cryptoki::session::UserType;
 use cryptoki::slot::Slot;
 use cryptoki::types::AuthPin;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tracing::{debug, info, trace};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -415,7 +415,7 @@ fn extract_object_info(
     let mut id = String::new();
     let mut key_type: Option<String> = None;
     let mut key_size: Option<usize> = None;
-    
+
     let mut token = false;
     let mut private = false;
     let mut modifiable = false;

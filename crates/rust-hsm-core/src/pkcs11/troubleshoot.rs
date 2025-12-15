@@ -492,7 +492,7 @@ pub fn find_key(
 
     if !objects.is_empty() {
         let mut keys_found = Vec::new();
-        
+
         for (idx, obj) in objects.iter().enumerate() {
             if let Ok(attrs) = session.get_attributes(
                 *obj,
@@ -544,7 +544,7 @@ pub fn find_key(
                     "capabilities": capabilities,
                     "flags": flags
                 }));
-                
+
                 if !json {
                     println!("Match {}:", idx + 1);
                     println!("  Type: {} ({})", class_str, key_type_str);
@@ -554,7 +554,7 @@ pub fn find_key(
                 }
             }
         }
-        
+
         if json {
             let json_output = serde_json::json!({
                 "status": "success",
@@ -844,7 +844,7 @@ pub fn diff_keys(
                 "explanation": explanation
             }));
         }
-        
+
         let json_output = serde_json::json!({
             "status": "success",
             "operation": "diff_keys",

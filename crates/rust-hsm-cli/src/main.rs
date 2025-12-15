@@ -102,7 +102,12 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            rust_hsm_core::token::init_pin(&module_path, &token_label, &so_pin_value, &user_pin_value)?;
+            rust_hsm_core::token::init_pin(
+                &module_path,
+                &token_label,
+                &so_pin_value,
+                &user_pin_value,
+            )?;
         }
         Commands::DeleteToken {
             label,
@@ -265,7 +270,13 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            rust_hsm_core::keys::delete_key(&module_path, &token_label, &user_pin_value, &key_label, json)?;
+            rust_hsm_core::keys::delete_key(
+                &module_path,
+                &token_label,
+                &user_pin_value,
+                &key_label,
+                json,
+            )?;
         }
         Commands::InspectKey {
             label,
@@ -658,8 +669,19 @@ fn main() -> anyhow::Result<()> {
                 &PathBuf::from(&cmac),
             )?;
         }
-        Commands::GenRandom { bytes, output, hex, json } => {
-            rust_hsm_core::random::generate_random(&module_path, bytes, output.as_ref(), hex, json)?;
+        Commands::GenRandom {
+            bytes,
+            output,
+            hex,
+            json,
+        } => {
+            rust_hsm_core::random::generate_random(
+                &module_path,
+                bytes,
+                output.as_ref(),
+                hex,
+                json,
+            )?;
         }
         Commands::Benchmark {
             label,
