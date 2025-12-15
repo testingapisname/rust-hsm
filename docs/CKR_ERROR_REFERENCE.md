@@ -482,12 +482,10 @@ docker exec rust-hsm-app rust-hsm-cli info
 **Solutions**:
 ```bash
 # Search for the key
-docker exec rust-hsm-app rust-hsm-cli find-key \
-  --label TOKEN --user-pin PIN \
-  --key-label key-name --show-similar
+docker exec rust-hsm-app rust-hsm-cli find-key --label TOKEN --user-pin PIN --key-label key-name --show-similar
 
 # List all objects
-docker exec rust-hsm-app rust-hsm-cli list-objects --detailed
+docker exec rust-hsm-app rust-hsm-cli list-objects --label TOKEN --user-pin PIN --detailed
 
 # Verify key exists before use
 # Re-login if session expired
@@ -610,7 +608,7 @@ docker exec rust-hsm-app rust-hsm-cli inspect-key --key-label <name>
 **Solutions**:
 ```bash
 # Check key attributes
-docker exec rust-hsm-app rust-hsm-cli inspect-key --key-label <name>
+docker exec rust-hsm-app rust-hsm-cli inspect-key --label TOKEN --user-pin PIN --key-label <name>
 
 # Look for:
 # CKA_SIGN, CKA_VERIFY, CKA_ENCRYPT, CKA_DECRYPT
@@ -633,7 +631,7 @@ docker exec rust-hsm-app rust-hsm-cli inspect-key --key-label <name>
 **Solutions**:
 ```bash
 # Check if key is extractable
-docker exec rust-hsm-app rust-hsm-cli inspect-key --key-label <name> | grep EXTRACTABLE
+docker exec rust-hsm-app rust-hsm-cli inspect-key --label TOKEN --user-pin PIN --key-label <name> | grep EXTRACTABLE
 
 # Regenerate with --extractable if needed
 # Some keys intentionally non-extractable for security
@@ -653,12 +651,11 @@ docker exec rust-hsm-app rust-hsm-cli inspect-key --key-label <name> | grep EXTR
 **Solutions**:
 ```bash
 # Verify extractable attribute
-docker exec rust-hsm-app rust-hsm-cli inspect-key --key-label <name>
+docker exec rust-hsm-app rust-hsm-cli inspect-key --label TOKEN --user-pin PIN --key-label <name>
 
 # If intentional: this is a security feature
 # If unintentional: regenerate with --extractable
-docker exec rust-hsm-app rust-hsm-cli gen-symmetric \
-  --key-label new-key --key-size 256 --extractable
+docker exec rust-hsm-app rust-hsm-cli gen-symmetric --label TOKEN --user-pin PIN --key-label new-key --key-size 256 --extractable
 ```
 
 ---
@@ -677,7 +674,7 @@ docker exec rust-hsm-app rust-hsm-cli gen-symmetric \
 **Solutions**:
 ```bash
 # Check supported mechanisms
-docker exec rust-hsm-app rust-hsm-cli list-mechanisms
+docker exec rust-hsm-app rust-hsm-cli list-mechanisms --detailed
 
 # Verify mechanism for key type:
 # - CKM_RSA_PKCS for RSA keys
@@ -724,7 +721,7 @@ docker exec rust-hsm-app rust-hsm-cli list-mechanisms
 **Solutions**:
 ```bash
 # List current objects
-docker exec rust-hsm-app rust-hsm-cli list-objects --detailed
+docker exec rust-hsm-app rust-hsm-cli list-objects --label TOKEN --user-pin PIN --detailed
 
 # Re-find object if needed
 # Verify session is still open
@@ -1267,10 +1264,10 @@ hexdump -C wrapped-key.bin
 **Solutions**:
 ```bash
 # Verify wrapping key exists
-docker exec rust-hsm-app rust-hsm-cli list-objects
+docker exec rust-hsm-app rust-hsm-cli list-objects --label TOKEN --user-pin PIN
 
 # Check key has CKA_WRAP=true
-docker exec rust-hsm-app rust-hsm-cli inspect-key --key-label wrap-key
+docker exec rust-hsm-app rust-hsm-cli inspect-key --label TOKEN --user-pin PIN --key-label wrap-key
 
 # Regenerate wrapping key if needed
 ```
@@ -1428,10 +1425,10 @@ docker exec rust-hsm-app rust-hsm-cli explain-error CKR_KEY_HANDLE_INVALID --con
 ```
 
 **Troubleshooting Steps:**
-- → Verify key exists: `rust-hsm-cli list-objects --detailed`
-- → Check key attributes: `rust-hsm-cli inspect-key --key-label <name>`
+- → Verify key exists: `rust-hsm-cli list-objects --label TOKEN --user-pin PIN --detailed`
+- → Check key attributes: `rust-hsm-cli inspect-key --label TOKEN --user-pin PIN --key-label <name>`
 - → Ensure CKA_SIGN=true on private key
-- → Test operation: `rust-hsm-cli sign --key-label <name> --input test.txt`
+- → Test operation: `rust-hsm-cli sign --label TOKEN --user-pin PIN --key-label <name> --input test.txt`
 - → Check mechanism support: `rust-hsm-cli list-mechanisms --detailed`
 
 ---
@@ -1517,13 +1514,13 @@ docker exec rust-hsm-app rust-hsm-cli list-slots
 docker exec rust-hsm-app rust-hsm-cli explain-error <code> --context <operation>
 
 # Find missing keys
-docker exec rust-hsm-app rust-hsm-cli find-key --key-label <name> --show-similar
+docker exec rust-hsm-app rust-hsm-cli find-key --label TOKEN --user-pin PIN --key-label <name> --show-similar
 
 # Check key capabilities
-docker exec rust-hsm-app rust-hsm-cli inspect-key --key-label <name>
+docker exec rust-hsm-app rust-hsm-cli inspect-key --label TOKEN --user-pin PIN --key-label <name>
 
 # Compare two keys
-docker exec rust-hsm-app rust-hsm-cli diff-keys --key1-label k1 --key2-label k2
+docker exec rust-hsm-app rust-hsm-cli diff-keys --label TOKEN --user-pin PIN --key1-label k1 --key2-label k2
 
 # List all mechanisms
 docker exec rust-hsm-app rust-hsm-cli list-mechanisms --detailed
