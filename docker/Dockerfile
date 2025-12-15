@@ -33,7 +33,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         softhsm2 \
         opensc \
-        ca-certificates && \
+        ca-certificates \
+        jq && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy Rust binary from builder

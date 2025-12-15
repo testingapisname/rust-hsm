@@ -55,8 +55,11 @@ done
 
 echo ""
 
+# Check for auto-confirmation first
+if [ "$AUTO_CONFIRM" = "yes" ]; then
+    echo "AUTO_CONFIRM=yes, proceeding with deletion..."
 # Check if running interactively
-if [ -t 0 ]; then
+elif [ -t 0 ]; then
     read -p "Delete these tokens? (y/N): " -n 1 -r
     echo ""
     
@@ -66,11 +69,8 @@ if [ -t 0 ]; then
     fi
 else
     # Non-interactive mode - require explicit confirmation via env variable
-    if [ "$AUTO_CONFIRM" != "yes" ]; then
-        echo "Non-interactive mode. Set AUTO_CONFIRM=yes to proceed automatically."
-        exit 1
-    fi
-    echo "AUTO_CONFIRM=yes, proceeding with deletion..."
+    echo "Non-interactive mode. Set AUTO_CONFIRM=yes to proceed automatically."
+    exit 1
 fi
 
 echo ""

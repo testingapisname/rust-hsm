@@ -429,6 +429,101 @@ $CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "compa
 $CLI diff-keys --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key1-label "compare-key-1" --key2-label "compare-key-2" 2>/dev/null | grep -q "Key Comparison" && echo "✓ diff-keys displays comparison" || exit 1
 $CLI diff-keys --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key1-label "compare-key-1" --key2-label "compare-key-2" 2>/dev/null | grep -q "KeyType" && echo "✓ diff-keys shows attribute differences" || exit 1
 
+# ========== JSON Output Tests ==========
+echo -e "\n${GREEN}=== JSON Output Tests ===${NC}"
+
+# Helper function to extract just JSON from CLI output
+extract_json() {
+    sed -n '/{/,/^}/p'
+}
+
+echo -e "\n${GREEN}[44/54] Testing info --json${NC}"
+INFO_JSON=$($CLI info --json 2>&1 | extract_json)
+echo "$INFO_JSON" | grep -q '"library_description"' && echo "✓ info JSON contains library_description" || exit 1
+echo "$INFO_JSON" | grep -q '"library_version"' && echo "✓ info JSON contains library_version" || exit 1
+echo "$INFO_JSON" | jq empty 2>/dev/null && echo "✓ info JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[45/54] Testing list-slots --json${NC}"
+SLOTS_JSON=$($CLI list-slots --json 2>&1 | extract_json)
+echo "$SLOTS_JSON" | grep -q '"all_slots"' && echo "✓ list-slots JSON contains all_slots array" || exit 1
+echo "$SLOTS_JSON" | jq empty 2>/dev/null && echo "✓ list-slots JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[46/54] Testing list-mechanisms --json${NC}"
+MECH_JSON=$($CLI list-mechanisms --json 2>&1 | extract_json)
+echo "$MECH_JSON" | grep -q '"mechanisms"' && echo "✓ list-mechanisms JSON contains mechanisms array" || exit 1
+echo "$MECH_JSON" | grep -q '"CKM_RSA_PKCS"' && echo "✓ list-mechanisms JSON decodes mechanism names" || exit 1
+echo "$MECH_JSON" | jq empty 2>/dev/null && echo "✓ list-mechanisms JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[47/54] Testing list-objects --json${NC}"
+OBJECTS_JSON=$($CLI list-objects --label "$TEST_TOKEN" --user-pin "$USER_PIN" --json 2>&1 | extract_json)
+echo "$OBJECTS_JSON" | grep -q '"objects"' && echo "✓ list-objects JSON contains objects array" || exit 1
+echo "$OBJECTS_JSON" | jq empty 2>/dev/null && echo "✓ list-objects JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[48/54] Testing gen-keypair --json${NC}"
+KEYGEN_JSON=$($CLI gen-keypair --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "json-test-key" --key-type rsa --bits 2048 --json 2>&1 | extract_json)
+echo "$KEYGEN_JSON" | grep -q '"status": "success"' && echo "✓ gen-keypair JSON contains status" || exit 1
+echo "$KEYGEN_JSON" | grep -q '"key_type": "RSA"' && echo "✓ gen-keypair JSON contains key_type" || exit 1
+echo "$KEYGEN_JSON" | grep -q '"public_key_handle"' && echo "✓ gen-keypair JSON contains public_key_handle" || exit 1
+echo "$KEYGEN_JSON" | grep -q '"private_key_handle"' && echo "✓ gen-keypair JSON contains private_key_handle" || exit 1
+echo "$KEYGEN_JSON" | jq empty 2>/dev/null && echo "✓ gen-keypair JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[49/54] Testing sign --json and verify --json${NC}"
+if [ -n "$DOCKER_CONTAINER" ]; then
+    docker exec $DOCKER_CONTAINER bash -c "echo 'JSON test data' > /app/test-json.txt"
+else
+    echo 'JSON test data' > /app/test-json.txt
+fi
+SIGN_JSON=$($CLI sign --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "json-test-key" --input /app/test-json.txt --output /app/test-json.sig --json 2>&1 | extract_json)
+echo "$SIGN_JSON" | grep -q '"operation": "sign"' && echo "✓ sign JSON contains operation" || exit 1
+echo "$SIGN_JSON" | grep -q '"signature_bytes"' && echo "✓ sign JSON contains signature_bytes" || exit 1
+echo "$SIGN_JSON" | jq empty 2>/dev/null && echo "✓ sign JSON is valid" || exit 1
+
+VERIFY_JSON=$($CLI verify --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "json-test-key" --input /app/test-json.txt --signature /app/test-json.sig --json 2>&1 | extract_json)
+echo "$VERIFY_JSON" | grep -q '"verification": "valid"' && echo "✓ verify JSON contains verification status" || exit 1
+echo "$VERIFY_JSON" | jq empty 2>/dev/null && echo "✓ verify JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[50/54] Testing export-pubkey --json${NC}"
+EXPORT_JSON=$($CLI export-pubkey --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "json-test-key" --output /app/test-json-export.pem --json 2>&1 | extract_json)
+echo "$EXPORT_JSON" | grep -q '"operation": "export_pubkey"' && echo "✓ export-pubkey JSON contains operation" || exit 1
+echo "$EXPORT_JSON" | grep -q '"format": "PEM"' && echo "✓ export-pubkey JSON contains format" || exit 1
+echo "$EXPORT_JSON" | grep -q '"output_bytes"' && echo "✓ export-pubkey JSON contains output_bytes" || exit 1
+echo "$EXPORT_JSON" | jq empty 2>/dev/null && echo "✓ export-pubkey JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[51/54] Testing gen-random --json${NC}"
+RANDOM_JSON=$($CLI gen-random --bytes 32 --json 2>&1 | extract_json)
+echo "$RANDOM_JSON" | grep -q '"operation": "generate_random"' && echo "✓ gen-random JSON contains operation" || exit 1
+echo "$RANDOM_JSON" | grep -q '"bytes": 32' && echo "✓ gen-random JSON contains bytes count" || exit 1
+echo "$RANDOM_JSON" | grep -q '"data"' && echo "✓ gen-random JSON contains data" || exit 1
+echo "$RANDOM_JSON" | jq empty 2>/dev/null && echo "✓ gen-random JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[52/54] Testing gen-csr --json${NC}"
+CSR_JSON=$($CLI gen-csr --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "json-test-key" --subject "CN=json-test.example.com,O=TestOrg,C=US" --output /app/test-json.csr --json 2>&1 | extract_json)
+echo "$CSR_JSON" | grep -q '"operation": "generate_csr"' && echo "✓ gen-csr JSON contains operation" || exit 1
+echo "$CSR_JSON" | grep -q '"subject"' && echo "✓ gen-csr JSON contains subject" || exit 1
+echo "$CSR_JSON" | grep -q '"output_bytes"' && echo "✓ gen-csr JSON contains output_bytes" || exit 1
+echo "$CSR_JSON" | jq empty 2>/dev/null && echo "✓ gen-csr JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[53/54] Testing find-key --json${NC}"
+FIND_JSON=$($CLI find-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "json-test-key" --json 2>&1 | extract_json)
+echo "$FIND_JSON" | grep -q '"operation": "find_key"' && echo "✓ find-key JSON contains operation" || exit 1
+echo "$FIND_JSON" | grep -q '"exact_match": true' && echo "✓ find-key JSON contains exact_match" || exit 1
+echo "$FIND_JSON" | grep -q '"keys_found"' && echo "✓ find-key JSON contains keys_found count" || exit 1
+echo "$FIND_JSON" | jq empty 2>/dev/null && echo "✓ find-key JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[54/54] Testing diff-keys --json${NC}"
+DIFF_JSON=$($CLI diff-keys --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key1-label "compare-key-1" --key2-label "compare-key-2" --json 2>&1 | extract_json)
+echo "$DIFF_JSON" | grep -q '"operation": "diff_keys"' && echo "✓ diff-keys JSON contains operation" || exit 1
+echo "$DIFF_JSON" | grep -q '"comparison"' && echo "✓ diff-keys JSON contains comparison array" || exit 1
+echo "$DIFF_JSON" | grep -q '"differences_found"' && echo "✓ diff-keys JSON contains differences_found count" || exit 1
+echo "$DIFF_JSON" | grep -q '"identical"' && echo "✓ diff-keys JSON contains identical field" || exit 1
+echo "$DIFF_JSON" | jq empty 2>/dev/null && echo "✓ diff-keys JSON is valid" || exit 1
+
+echo -e "\n${GREEN}[55/55] Testing delete-key --json${NC}"
+DELETE_JSON=$($CLI delete-key --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "json-test-key" --json 2>&1 | extract_json)
+echo "$DELETE_JSON" | grep -q '"operation": "delete_key"' && echo "✓ delete-key JSON contains operation" || exit 1
+echo "$DELETE_JSON" | grep -q '"objects_removed"' && echo "✓ delete-key JSON contains objects_removed count" || exit 1
+echo "$DELETE_JSON" | jq empty 2>/dev/null && echo "✓ delete-key JSON is valid" || exit 1
+
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
 
 # Run cleanup script to remove all test tokens

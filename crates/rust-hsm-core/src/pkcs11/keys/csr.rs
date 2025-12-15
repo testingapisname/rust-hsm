@@ -24,6 +24,7 @@ pub fn generate_csr(
     key_label: &str,
     subject_dn: &str,
     output_path: &str,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -80,13 +81,27 @@ pub fn generate_csr(
     fs::write(output_path, pem.as_bytes())?;
 
     info!("CSR generated successfully");
-    println!(
-        "Certificate Signing Request generated for key '{}'",
-        key_label
-    );
-    println!("  Subject: {}", subject_dn);
-    println!("  Key type: {:?}", key_type);
-    println!("  Output: {} ({} bytes)", output_path, pem.len());
+    if json {
+        let json_output = serde_json::json!({
+            "status": "success",
+            "operation": "generate_csr",
+            "key_label": key_label,
+            "subject": subject_dn,
+            "key_type": format!("{:?}", key_type),
+            "output_file": output_path,
+            "output_bytes": pem.len(),
+            "format": "PEM"
+        });
+        println!("{}", serde_json::to_string_pretty(&json_output)?);
+    } else {
+        println!(
+            "Certificate Signing Request generated for key '{}'",
+            key_label
+        );
+        println!("  Subject: {}", subject_dn);
+        println!("  Key type: {:?}", key_type);
+        println!("  Output: {} ({} bytes)", output_path, pem.len());
+    }
 
     debug!("→ Calling C_Logout");
     session.logout()?;

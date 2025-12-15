@@ -465,6 +465,7 @@ pub fn find_key(
     user_pin: &str,
     key_label: &str,
     show_similar: bool,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -480,7 +481,9 @@ pub fn find_key(
     session.login(UserType::User, Some(&pin))?;
 
     info!("Searching for key: '{}'", key_label);
-    println!("\n=== Key Search: '{}' ===\n", key_label);
+    if !json {
+        println!("\n=== Key Search: '{}' ===\n", key_label);
+    }
 
     // Search for exact match
     let template = vec![Attribute::Label(key_label.as_bytes().to_vec())];
@@ -488,7 +491,8 @@ pub fn find_key(
     let objects = session.find_objects(&template)?;
 
     if !objects.is_empty() {
-        println!("✓ Exact match found!\n");
+        let mut keys_found = Vec::new();
+        
         for (idx, obj) in objects.iter().enumerate() {
             if let Ok(attrs) = session.get_attributes(
                 *obj,
@@ -533,12 +537,36 @@ pub fn find_key(
                     }
                 }
 
-                println!("Match {}:", idx + 1);
-                println!("  Type: {} ({})", class_str, key_type_str);
-                println!("  Capabilities: {}", capabilities.join(", "));
-                println!("  Flags: {}", flags.join(", "));
-                println!();
+                keys_found.push(serde_json::json!({
+                    "match_number": idx + 1,
+                    "class": class_str,
+                    "key_type": key_type_str,
+                    "capabilities": capabilities,
+                    "flags": flags
+                }));
+                
+                if !json {
+                    println!("Match {}:", idx + 1);
+                    println!("  Type: {} ({})", class_str, key_type_str);
+                    println!("  Capabilities: {}", capabilities.join(", "));
+                    println!("  Flags: {}", flags.join(", "));
+                    println!();
+                }
             }
+        }
+        
+        if json {
+            let json_output = serde_json::json!({
+                "status": "success",
+                "operation": "find_key",
+                "search_key": key_label,
+                "exact_match": true,
+                "keys_found": keys_found.len(),
+                "keys": keys_found
+            });
+            println!("{}", serde_json::to_string_pretty(&json_output)?);
+        } else {
+            println!("✓ Exact match found!\n");
         }
 
         session.logout()?;
@@ -547,7 +575,9 @@ pub fn find_key(
     }
 
     // No exact match - find similar keys if requested
-    println!("✗ Exact match not found");
+    if !json {
+        println!("✗ Exact match not found");
+    }
 
     if show_similar {
         println!("\nSearching for similar keys...\n");
@@ -684,6 +714,7 @@ pub fn diff_keys(
     user_pin: &str,
     key1_label: &str,
     key2_label: &str,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -699,10 +730,12 @@ pub fn diff_keys(
     session.login(UserType::User, Some(&pin))?;
 
     info!("Comparing keys: '{}' vs '{}'", key1_label, key2_label);
-    println!("\n=== Key Comparison ===\n");
-    println!("Key 1: {}", key1_label);
-    println!("Key 2: {}", key2_label);
-    println!();
+    if !json {
+        println!("\n=== Key Comparison ===\n");
+        println!("Key 1: {}", key1_label);
+        println!("Key 2: {}", key2_label);
+        println!();
+    }
 
     // Find both keys
     let key1 = session
@@ -746,35 +779,45 @@ pub fn diff_keys(
         .unwrap_or_default();
 
     // Build comparison table
-    println!(
-        "{:<30} {:<20} {:<20} {}",
-        "Attribute", "Key 1", "Key 2", "Status"
-    );
-    println!("{}", "─".repeat(80));
+    if !json {
+        println!(
+            "{:<30} {:<20} {:<20} {}",
+            "Attribute", "Key 1", "Key 2", "Status"
+        );
+        println!("{}", "─".repeat(80));
+    }
 
     let mut differences = Vec::new();
+    let mut comparison_data = Vec::new();
 
     // Compare attributes
     for attr_type in &attr_types {
         let val1 = format_attribute_value(&attrs1, attr_type);
         let val2 = format_attribute_value(&attrs2, attr_type);
 
-        let status = if val1 == val2 { "✓" } else { "✗" };
+        let matches = val1 == val2;
         let attr_name = format!("{:?}", attr_type).replace("AttributeType::", "CKA_");
 
-        println!("{:<30} {:<20} {:<20} {}", attr_name, val1, val2, status);
+        comparison_data.push(serde_json::json!({
+            "attribute": attr_name.clone(),
+            "key1_value": val1.clone(),
+            "key2_value": val2.clone(),
+            "matches": matches
+        }));
 
-        if val1 != val2 {
+        if !json {
+            let status = if matches { "✓" } else { "✗" };
+            println!("{:<30} {:<20} {:<20} {}", attr_name, val1, val2, status);
+        }
+
+        if !matches {
             differences.push((attr_name, val1, val2));
         }
     }
 
     // Summary
-    if differences.is_empty() {
-        println!("\n✓ Keys are identical in all checked attributes");
-    } else {
-        println!("\n✗ Found {} difference(s):\n", differences.len());
-
+    if json {
+        let mut diff_details = Vec::new();
         for (attr, val1, val2) in &differences {
             // Determine severity
             let (severity, explanation) = match attr.as_str() {
@@ -793,19 +836,63 @@ pub fn diff_keys(
                 _ => ("LOW", "Minor difference in key properties"),
             };
 
-            println!(
-                "{} {}: {} vs {}",
-                match severity {
-                    "CRITICAL" => "✗",
-                    "HIGH" => "⚠",
-                    _ => "ℹ",
-                },
-                attr,
-                val1,
-                val2
-            );
-            println!("  → {}", explanation);
-            println!();
+            diff_details.push(serde_json::json!({
+                "attribute": attr,
+                "key1_value": val1,
+                "key2_value": val2,
+                "severity": severity,
+                "explanation": explanation
+            }));
+        }
+        
+        let json_output = serde_json::json!({
+            "status": "success",
+            "operation": "diff_keys",
+            "key1_label": key1_label,
+            "key2_label": key2_label,
+            "identical": differences.is_empty(),
+            "differences_found": differences.len(),
+            "comparison": comparison_data,
+            "differences": diff_details
+        });
+        println!("{}", serde_json::to_string_pretty(&json_output)?);
+    } else {
+        if differences.is_empty() {
+            println!("\n✓ Keys are identical in all checked attributes");
+        } else {
+            println!("\n✗ Found {} difference(s):\n", differences.len());
+
+            for (attr, val1, val2) in &differences {
+                let (severity, explanation) = match attr.as_str() {
+                    "CKA_Sign" | "CKA_Verify" | "CKA_Encrypt" | "CKA_Decrypt" => (
+                        "CRITICAL",
+                        "This affects key functionality - operations may fail",
+                    ),
+                    "CKA_Sensitive"
+                    | "CKA_Extractable"
+                    | "CKA_AlwaysSensitive"
+                    | "CKA_NeverExtractable" => ("HIGH", "This affects key security posture"),
+                    "CKA_Local" => (
+                        "MEDIUM",
+                        "One key was imported, the other was generated on HSM",
+                    ),
+                    _ => ("LOW", "Minor difference in key properties"),
+                };
+
+                println!(
+                    "{} {}: {} vs {}",
+                    match severity {
+                        "CRITICAL" => "✗",
+                        "HIGH" => "⚠",
+                        _ => "ℹ",
+                    },
+                    attr,
+                    val1,
+                    val2
+                );
+                println!("  → {}", explanation);
+                println!();
+            }
         }
     }
 

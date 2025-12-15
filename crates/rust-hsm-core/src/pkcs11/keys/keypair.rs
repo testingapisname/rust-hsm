@@ -15,6 +15,7 @@ pub fn gen_keypair(
     key_type: &str,
     bits: u32,
     extractable: bool,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -78,12 +79,25 @@ pub fn gen_keypair(
                 &private_key_template,
             )?;
 
-            println!(
-                "RSA-{} keypair '{}' generated successfully",
-                bits, key_label
-            );
-            println!("  Public key handle: {:?}", public_key);
-            println!("  Private key handle: {:?}", private_key);
+            if json {
+                let json_output = serde_json::json!({
+                    "status": "success",
+                    "key_type": "RSA",
+                    "bits": bits,
+                    "key_label": key_label,
+                    "public_key_handle": format!("{:?}", public_key),
+                    "private_key_handle": format!("{:?}", private_key),
+                    "extractable": extractable
+                });
+                println!("{}", serde_json::to_string_pretty(&json_output)?);
+            } else {
+                println!(
+                    "RSA-{} keypair '{}' generated successfully",
+                    bits, key_label
+                );
+                println!("  Public key handle: {:?}", public_key);
+                println!("  Private key handle: {:?}", private_key);
+            }
         }
         "ecdsa" | "ec" | "p256" | "p384" => {
             let mechanism = Mechanism::EccKeyPairGen;
@@ -134,12 +148,25 @@ pub fn gen_keypair(
                 "p384" => "P-384",
                 _ => "P-256",
             };
-            println!(
-                "ECDSA {} keypair '{}' generated successfully",
-                curve_name, key_label
-            );
-            println!("  Public key handle: {:?}", public_key);
-            println!("  Private key handle: {:?}", private_key);
+            if json {
+                let json_output = serde_json::json!({
+                    "status": "success",
+                    "key_type": "ECDSA",
+                    "curve": curve_name,
+                    "key_label": key_label,
+                    "public_key_handle": format!("{:?}", public_key),
+                    "private_key_handle": format!("{:?}", private_key),
+                    "extractable": extractable
+                });
+                println!("{}", serde_json::to_string_pretty(&json_output)?);
+            } else {
+                println!(
+                    "ECDSA {} keypair '{}' generated successfully",
+                    curve_name, key_label
+                );
+                println!("  Public key handle: {:?}", public_key);
+                println!("  Private key handle: {:?}", private_key);
+            }
         }
         _ => {
             anyhow::bail!("Unsupported key type: {}. Use 'rsa' or 'ecdsa'", key_type);

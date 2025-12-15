@@ -15,6 +15,7 @@ pub fn sign(
     key_label: &str,
     input_path: &str,
     output_path: &str,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module for signing operation");
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -79,9 +80,23 @@ pub fn sign(
     // Write signature
     fs::write(output_path, &signature)?;
 
-    println!("Signature created successfully");
-    println!("  Input: {} ({} bytes)", input_path, data.len());
-    println!("  Signature: {} ({} bytes)", output_path, signature.len());
+    if json {
+        let json_output = serde_json::json!({
+            "status": "success",
+            "operation": "sign",
+            "key_label": key_label,
+            "key_type": format!("{:?}", key_type),
+            "input_file": input_path,
+            "input_bytes": data.len(),
+            "signature_file": output_path,
+            "signature_bytes": signature.len()
+        });
+        println!("{}", serde_json::to_string_pretty(&json_output)?);
+    } else {
+        println!("Signature created successfully");
+        println!("  Input: {} ({} bytes)", input_path, data.len());
+        println!("  Signature: {} ({} bytes)", output_path, signature.len());
+    }
 
     session.logout()?;
     pkcs11.finalize();
@@ -96,6 +111,7 @@ pub fn verify(
     key_label: &str,
     input_path: &str,
     signature_path: &str,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module for verification operation");
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -178,18 +194,43 @@ pub fn verify(
     match verify_result {
         Ok(_) => {
             debug!("PKCS#11 verify operation succeeded");
-            println!("✓ Signature verification successful");
-            println!("  Input: {} ({} bytes)", input_path, data.len());
-            println!(
-                "  Signature: {} ({} bytes)",
-                signature_path,
-                signature.len()
-            );
-            println!("  Key type: {:?}", key_type);
+            if json {
+                let json_output = serde_json::json!({
+                    "status": "success",
+                    "operation": "verify",
+                    "verification": "valid",
+                    "key_label": key_label,
+                    "key_type": format!("{:?}", key_type),
+                    "input_file": input_path,
+                    "input_bytes": data.len(),
+                    "signature_file": signature_path,
+                    "signature_bytes": signature.len()
+                });
+                println!("{}", serde_json::to_string_pretty(&json_output)?);
+            } else {
+                println!("✓ Signature verification successful");
+                println!("  Input: {} ({} bytes)", input_path, data.len());
+                println!(
+                    "  Signature: {} ({} bytes)",
+                    signature_path,
+                    signature.len()
+                );
+                println!("  Key type: {:?}", key_type);
+            }
         }
         Err(e) => {
             debug!("PKCS#11 verify operation failed: {:?}", e);
-            println!("✗ Signature verification failed: {}", e);
+            if json {
+                let json_output = serde_json::json!({
+                    "status": "error",
+                    "operation": "verify",
+                    "verification": "invalid",
+                    "error": format!("{}", e)
+                });
+                println!("{}", serde_json::to_string_pretty(&json_output)?);
+            } else {
+                println!("✗ Signature verification failed: {}", e);
+            }
             anyhow::bail!("Verification failed");
         }
     }

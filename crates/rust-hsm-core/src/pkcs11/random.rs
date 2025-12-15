@@ -12,6 +12,7 @@ pub fn generate_random(
     bytes: usize,
     output: Option<&PathBuf>,
     hex: bool,
+    json: bool,
 ) -> Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)
@@ -44,34 +45,67 @@ pub fn generate_random(
 
     info!("Generated {} random bytes", random_bytes.len());
 
+    let hex_string = random_bytes
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+    
     if let Some(output_path) = output {
         if hex {
             // Write as hex string
-            let hex_string = random_bytes
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<String>();
-            fs::write(output_path, hex_string).with_context(|| {
+            fs::write(output_path, &hex_string).with_context(|| {
                 format!("Failed to write hex output to: {}", output_path.display())
             })?;
-            println!("Random bytes (hex) written to: {}", output_path.display());
+            if json {
+                let json_output = serde_json::json!({
+                    "status": "success",
+                    "operation": "generate_random",
+                    "bytes": random_bytes.len(),
+                    "format": "hex",
+                    "output_file": output_path.display().to_string(),
+                    "data": hex_string
+                });
+                println!("{}", serde_json::to_string_pretty(&json_output)?);
+            } else {
+                println!("Random bytes (hex) written to: {}", output_path.display());
+                println!("  Length: {} bytes", random_bytes.len());
+            }
         } else {
             // Write as binary
             fs::write(output_path, &random_bytes)
                 .with_context(|| format!("Failed to write output to: {}", output_path.display()))?;
-            println!(
-                "Random bytes (binary) written to: {}",
-                output_path.display()
-            );
+            if json {
+                let json_output = serde_json::json!({
+                    "status": "success",
+                    "operation": "generate_random",
+                    "bytes": random_bytes.len(),
+                    "format": "binary",
+                    "output_file": output_path.display().to_string(),
+                    "data_hex": hex_string
+                });
+                println!("{}", serde_json::to_string_pretty(&json_output)?);
+            } else {
+                println!(
+                    "Random bytes (binary) written to: {}",
+                    output_path.display()
+                );
+                println!("  Length: {} bytes", random_bytes.len());
+            }
         }
-        println!("  Length: {} bytes", random_bytes.len());
     } else {
-        // Output to stdout as hex
-        let hex_string = random_bytes
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<String>();
-        println!("{}", hex_string);
+        // Output to stdout
+        if json {
+            let json_output = serde_json::json!({
+                "status": "success",
+                "operation": "generate_random",
+                "bytes": random_bytes.len(),
+                "format": "hex",
+                "data": hex_string
+            });
+            println!("{}", serde_json::to_string_pretty(&json_output)?);
+        } else {
+            println!("{}", hex_string);
+        }
     }
 
     debug!("→ Calling C_Finalize");

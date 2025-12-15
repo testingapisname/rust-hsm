@@ -73,6 +73,7 @@ pub fn delete_key(
     label: &str,
     user_pin: &str,
     key_label: &str,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -123,10 +124,20 @@ pub fn delete_key(
     drop(session);
     pkcs11.finalize();
 
-    println!(
-        "Key '{}' deleted successfully ({} object(s) removed)",
-        key_label,
-        objects.len()
-    );
+    if json {
+        let json_output = serde_json::json!({
+            "status": "success",
+            "operation": "delete_key",
+            "key_label": key_label,
+            "objects_removed": objects.len()
+        });
+        println!("{}", serde_json::to_string_pretty(&json_output)?);
+    } else {
+        println!(
+            "Key '{}' deleted successfully ({} object(s) removed)",
+            key_label,
+            objects.len()
+        );
+    }
     Ok(())
 }

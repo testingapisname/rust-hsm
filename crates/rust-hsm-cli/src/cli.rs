@@ -16,7 +16,11 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Display PKCS#11 module and token information
-    Info,
+    Info {
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
 
     /// List all available slots and tokens
     ListSlots {
@@ -113,6 +117,9 @@ pub enum Commands {
         /// Make private key extractable (INSECURE - for testing only)
         #[arg(long)]
         extractable: bool,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
@@ -131,6 +138,9 @@ pub enum Commands {
         input: String,
         #[arg(long)]
         output: String,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
@@ -149,6 +159,9 @@ pub enum Commands {
         input: String,
         #[arg(long)]
         signature: String,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
@@ -165,6 +178,9 @@ pub enum Commands {
         key_label: String,
         #[arg(long)]
         output: String,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
@@ -179,6 +195,9 @@ pub enum Commands {
         user_pin: Option<String>,
         #[arg(long)]
         key_label: String,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
@@ -354,6 +373,9 @@ pub enum Commands {
         /// Output file for the CSR in PEM format
         #[arg(long)]
         output: String,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
@@ -506,6 +528,9 @@ pub enum Commands {
         /// Output as hex string instead of binary (only applies to file output)
         #[arg(long)]
         hex: bool,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
     },
 
     /// Run comprehensive performance benchmarks
@@ -578,6 +603,9 @@ pub enum Commands {
         /// Show similar keys when exact match not found
         #[arg(long)]
         show_similar: bool,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
@@ -596,6 +624,9 @@ pub enum Commands {
         /// Second key label
         #[arg(long)]
         key2_label: String,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
         /// Read user PIN from stdin instead of command line
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,

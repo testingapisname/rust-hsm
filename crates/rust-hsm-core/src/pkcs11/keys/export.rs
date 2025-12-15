@@ -14,6 +14,7 @@ pub fn export_pubkey(
     user_pin: &str,
     key_label: &str,
     output_path: &str,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -82,8 +83,22 @@ pub fn export_pubkey(
     };
 
     // Write PEM to file
-    fs::write(output_path, pem_content)?;
-    println!("Public key exported to: {}", output_path);
+    fs::write(output_path, &pem_content)?;
+    
+    if json {
+        let json_output = serde_json::json!({
+            "status": "success",
+            "operation": "export_pubkey",
+            "key_label": key_label,
+            "key_type": format!("{:?}", key_type),
+            "output_file": output_path,
+            "output_bytes": pem_content.len(),
+            "format": "PEM"
+        });
+        println!("{}", serde_json::to_string_pretty(&json_output)?);
+    } else {
+        println!("Public key exported to: {}", output_path);
+    }
 
     debug!("→ Calling C_Logout");
     session.logout()?;

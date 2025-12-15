@@ -54,8 +54,8 @@ fn main() -> anyhow::Result<()> {
     info!("Using PKCS#11 module: {}", module_path);
 
     match cli.command {
-        Commands::Info => {
-            rust_hsm_core::info::display_info(&module_path)?;
+        Commands::Info { json } => {
+            rust_hsm_core::info::display_info(&module_path, json)?;
         }
         Commands::ListSlots { json } => {
             rust_hsm_core::slots::list_slots(&module_path, json)?;
@@ -149,6 +149,7 @@ fn main() -> anyhow::Result<()> {
             key_type,
             bits,
             extractable,
+            json,
             pin_stdin,
         } => {
             let token_label = config
@@ -167,6 +168,7 @@ fn main() -> anyhow::Result<()> {
                 &key_type,
                 bits,
                 extractable,
+                json,
             )?;
         }
         Commands::Sign {
@@ -175,6 +177,7 @@ fn main() -> anyhow::Result<()> {
             key_label,
             input,
             output,
+            json,
             pin_stdin,
         } => {
             let token_label = config
@@ -192,6 +195,7 @@ fn main() -> anyhow::Result<()> {
                 &key_label,
                 &input,
                 &output,
+                json,
             )?;
         }
         Commands::Verify {
@@ -200,6 +204,7 @@ fn main() -> anyhow::Result<()> {
             key_label,
             input,
             signature,
+            json,
             pin_stdin,
         } => {
             let token_label = config
@@ -217,6 +222,7 @@ fn main() -> anyhow::Result<()> {
                 &key_label,
                 &input,
                 &signature,
+                json,
             )?;
         }
         Commands::ExportPubkey {
@@ -224,6 +230,7 @@ fn main() -> anyhow::Result<()> {
             user_pin,
             key_label,
             output,
+            json,
             pin_stdin,
         } => {
             let token_label = config
@@ -240,12 +247,14 @@ fn main() -> anyhow::Result<()> {
                 &user_pin_value,
                 &key_label,
                 &output,
+                json,
             )?;
         }
         Commands::DeleteKey {
             label,
             user_pin,
             key_label,
+            json,
             pin_stdin,
         } => {
             let token_label = config
@@ -256,7 +265,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            rust_hsm_core::keys::delete_key(&module_path, &token_label, &user_pin_value, &key_label)?;
+            rust_hsm_core::keys::delete_key(&module_path, &token_label, &user_pin_value, &key_label, json)?;
         }
         Commands::InspectKey {
             label,
@@ -464,6 +473,7 @@ fn main() -> anyhow::Result<()> {
             key_label,
             subject,
             output,
+            json,
             pin_stdin,
         } => {
             let token_label = config
@@ -481,6 +491,7 @@ fn main() -> anyhow::Result<()> {
                 &key_label,
                 &subject,
                 &output,
+                json,
             )?;
         }
         Commands::Hash {
@@ -647,8 +658,8 @@ fn main() -> anyhow::Result<()> {
                 &PathBuf::from(&cmac),
             )?;
         }
-        Commands::GenRandom { bytes, output, hex } => {
-            rust_hsm_core::random::generate_random(&module_path, bytes, output.as_ref(), hex)?;
+        Commands::GenRandom { bytes, output, hex, json } => {
+            rust_hsm_core::random::generate_random(&module_path, bytes, output.as_ref(), hex, json)?;
         }
         Commands::Benchmark {
             label,
@@ -710,6 +721,7 @@ fn main() -> anyhow::Result<()> {
             user_pin,
             key_label,
             show_similar,
+            json,
             pin_stdin,
         } => {
             let token_label = config
@@ -726,6 +738,7 @@ fn main() -> anyhow::Result<()> {
                 &user_pin_value,
                 &key_label,
                 show_similar,
+                json,
             )?;
         }
         Commands::DiffKeys {
@@ -733,6 +746,7 @@ fn main() -> anyhow::Result<()> {
             user_pin,
             key1_label,
             key2_label,
+            json,
             pin_stdin,
         } => {
             let token_label = config
@@ -749,6 +763,7 @@ fn main() -> anyhow::Result<()> {
                 &user_pin_value,
                 &key1_label,
                 &key2_label,
+                json,
             )?;
         }
     }
