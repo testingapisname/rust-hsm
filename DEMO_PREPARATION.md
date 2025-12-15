@@ -55,7 +55,38 @@ docker exec rust-hsm-app rust-hsm-cli inspect-key --label DEMO_TOKEN --user-pin 
 
 ---
 
-### 3. **Security & Compliance** (2-3 minutes)
+### 3. **Automation & JSON Output** (3-5 minutes)
+Show how rust-hsm transforms into automation infrastructure:
+
+```bash
+# Get key fingerprint for CI/CD validation
+docker exec rust-hsm-app rust-hsm-cli inspect-key \
+  --label DEMO_TOKEN --user-pin demo-pin --key-label signing-key --json \
+  | jq -r '.objects[0].fingerprint'
+
+# Fleet auditing - list all keys
+docker exec rust-hsm-app rust-hsm-cli list-objects \
+  --label DEMO_TOKEN --user-pin demo-pin --json \
+  | jq -r '.objects[].label'
+
+# Compliance reporting - find non-extractable keys
+docker exec rust-hsm-app rust-hsm-cli list-objects \
+  --label DEMO_TOKEN --user-pin demo-pin --json --detailed \
+  | jq '.objects[] | select(.flags.extractable == false) | {label, key_type}'
+
+# Capacity monitoring
+docker exec rust-hsm-app rust-hsm-cli list-objects \
+  --label DEMO_TOKEN --user-pin demo-pin --json \
+  | jq '.object_count'
+
+# Mechanism discovery
+docker exec rust-hsm-app rust-hsm-cli list-mechanisms --json \
+  | jq '.mechanisms[] | select(.category == "RSA") | .name'
+```
+
+---
+
+### 4. **Security & Compliance** (2-3 minutes)
 Show enterprise-grade security features:
 
 ```bash
@@ -72,7 +103,7 @@ docker exec rust-hsm-app rust-hsm-cli wrap-key --label DEMO_TOKEN --user-pin dem
 
 ---
 
-### 4. **Documentation & Error Reference** (2 minutes)
+### 5. **Documentation & Error Reference** (2 minutes)
 Show the comprehensive documentation:
 
 ```bash
@@ -89,7 +120,7 @@ ls docs/
 
 ---
 
-### 5. **CI/CD Pipeline** (3 minutes)
+### 6. **CI/CD Pipeline** (3 minutes)
 Show the GitHub Actions workflows:
 
 ```bash
@@ -108,7 +139,7 @@ gh run view
 
 ---
 
-### 6. **Performance Benchmarking** (2 minutes)
+### 7. **Performance Benchmarking** (2 minutes)
 Demonstrate performance testing:
 
 ```bash
@@ -142,16 +173,17 @@ docker exec rust-hsm-app rust-hsm-cli benchmark --label DEMO_TOKEN --user-pin de
    - Encrypt data
    - Decrypt data
 
-3. **Advanced Features** (3 min)
+3. **Automation & JSON** (3 min)
+   - Show JSON output for CI/CD
+   - Fleet auditing examples
+   - Compliance reporting
+   - Machine-parseable output with jq
+
+4. **Advanced Features** (2 min)
    - Key wrapping/unwrapping
    - CSR generation
    - Key fingerprinting
    - Troubleshooting commands
-
-4. **Documentation** (2 min)
-   - Show error reference
-   - Demonstrate explain-error command
-   - Browse command docs
 
 ### **Technical Deep-Dive** (3 min)
 - **Architecture**: Docker + SoftHSM2 + Rust
@@ -217,6 +249,13 @@ docker exec rust-hsm-app rust-hsm-cli benchmark --label DEMO_TOKEN --user-pin de
 - RSA, ECDSA, AES support
 - Sign/verify, encrypt/decrypt
 - Key management and wrapping
+
+### **5. Automation-First**
+- JSON output for all key commands
+- CI/CD integration ready
+- Fleet auditing capabilities
+- Machine-parseable structured data
+- Works with jq, PowerShell, Python
 - Token management
 - Benchmarking and diagnostics
 
