@@ -131,35 +131,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
       
-      - name: Build Docker image
-        run: docker compose build
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
       
-      - name: Start container
-        run: docker compose up -d
-      
-      - name: Wait for container
-        run: sleep 5
-      
-      - name: Install tarpaulin in container
-        run: docker exec rust-hsm-app cargo install cargo-tarpaulin
-      
-      - name: Initialize test token for coverage
+      - name: Install SoftHSM2
         run: |
-          docker exec rust-hsm-app softhsm2-util --init-token \
+          sudo apt-get update
+          sudo apt-get install -y softhsm2
+          mkdir -p $HOME/.config/softhsm2
+          echo "directories.tokendir = $HOME/.softhsm/tokens/" > $HOME/.config/softhsm2/softhsm2.conf
+          mkdir -p $HOME/.softhsm/tokens
+      
+      - name: Install tarpaulin
+        run: cargo install cargo-tarpaulin
+      
+      - name: Initialize test token
+        run: |
+          softhsm2-util --init-token \
             --slot 0 --label COVERAGE_TOKEN \
             --so-pin 12345678 --pin 123456
       
+      - name: Configure application
+        run: |
+          cat > .rust-hsm.toml << EOF
+          pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"
+          default_slot = 0
+          EOF
+      
       - name: Generate coverage with integration tests
         run: |
-          docker exec rust-hsm-app bash -c "cd /app/crates/rust-hsm-cli && \
-            cargo tarpaulin --out Xml --output-dir /app/coverage \
-            --engine llvm --follow-exec --timeout 300 -- --test-threads=1 --ignored"
-      
-      - name: Copy coverage report
-        run: docker cp rust-hsm-app:/app/coverage/cobertura.xml ./coverage/cobertura.xml
+          cd crates/rust-hsm-cli
+          cargo tarpaulin --out Xml --output-dir ../../coverage \
+            --engine llvm --follow-exec --timeout 300 -- --test-threads=1 --ignored
+        env:
+          SOFTHSM2_CONF: ${{ env.HOME }}/.config/softhsm2/softhsm2.conf
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -172,9 +188,9 @@ jobs:
         run: |
           if [ -f ./coverage/cobertura.xml ]; then
             echo "Coverage report generated successfully"
-            grep -o 'line-rate="[^"]*"' ./coverage/cobertura.xml | head -1 || echo "Could not extract coverage rate"
+            COVERAGE=$(grep -o 'line-rate="[^"]*"' ./coverage/cobertura.xml | head -1 | grep -o '[0-9.]*')
+            if [ -n "$COVERAGE" ]; then
+              PERCENT=$(echo "$COVERAGE * 100" | bc)
+              echo "Line coverage: ${PERCENT}%"
+            fi
           fi
-      
-      - name: Stop container
-        if: always()
-        run: docker compose down
