@@ -780,10 +780,7 @@ pub fn diff_keys(
 
     // Build comparison table
     if !json {
-        println!(
-            "{:<30} {:<20} {:<20} Status",
-            "Attribute", "Key 1", "Key 2"
-        );
+        println!("{:<30} {:<20} {:<20} Status", "Attribute", "Key 1", "Key 2");
         println!("{}", "─".repeat(80));
     }
 
@@ -861,34 +858,34 @@ pub fn diff_keys(
     } else {
         println!("\n✗ Found {} difference(s):\n", differences.len());
 
-            for (attr, val1, val2) in &differences {
-                let (severity, explanation) = match attr.as_str() {
-                    "CKA_Sign" | "CKA_Verify" | "CKA_Encrypt" | "CKA_Decrypt" => (
-                        "CRITICAL",
-                        "This affects key functionality - operations may fail",
-                    ),
-                    "CKA_Sensitive"
-                    | "CKA_Extractable"
-                    | "CKA_AlwaysSensitive"
-                    | "CKA_NeverExtractable" => ("HIGH", "This affects key security posture"),
-                    "CKA_Local" => (
-                        "MEDIUM",
-                        "One key was imported, the other was generated on HSM",
-                    ),
-                    _ => ("LOW", "Minor difference in key properties"),
-                };
+        for (attr, val1, val2) in &differences {
+            let (severity, explanation) = match attr.as_str() {
+                "CKA_Sign" | "CKA_Verify" | "CKA_Encrypt" | "CKA_Decrypt" => (
+                    "CRITICAL",
+                    "This affects key functionality - operations may fail",
+                ),
+                "CKA_Sensitive"
+                | "CKA_Extractable"
+                | "CKA_AlwaysSensitive"
+                | "CKA_NeverExtractable" => ("HIGH", "This affects key security posture"),
+                "CKA_Local" => (
+                    "MEDIUM",
+                    "One key was imported, the other was generated on HSM",
+                ),
+                _ => ("LOW", "Minor difference in key properties"),
+            };
 
-                println!(
-                    "{} {}: {} vs {}",
-                    match severity {
-                        "CRITICAL" => "✗",
-                        "HIGH" => "⚠",
-                        _ => "ℹ",
-                    },
-                    attr,
-                    val1,
-                    val2
-                );
+            println!(
+                "{} {}: {} vs {}",
+                match severity {
+                    "CRITICAL" => "✗",
+                    "HIGH" => "⚠",
+                    _ => "ℹ",
+                },
+                attr,
+                val1,
+                val2
+            );
             println!("  → {}", explanation);
             println!();
         }

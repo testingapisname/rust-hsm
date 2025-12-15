@@ -36,8 +36,6 @@ pub fn find_token_slot(pkcs11: &Pkcs11, label: &str) -> anyhow::Result<Slot> {
     anyhow::bail!("Token with label '{}' not found", label)
 }
 
-
-
 pub(super) fn get_key_type(
     session: &Session,
     key_handle: ObjectHandle,
