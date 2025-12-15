@@ -5,11 +5,14 @@ FROM rust:1.83-bookworm AS builder
 WORKDIR /build
 
 # Copy workspace configuration first
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Copy Cargo files for both crates (for layer caching)
 COPY crates/rust-hsm-core/Cargo.toml crates/rust-hsm-core/Cargo.toml
 COPY crates/rust-hsm-cli/Cargo.toml crates/rust-hsm-cli/Cargo.toml
+
+# Generate lockfile
+RUN cargo generate-lockfile
 
 # Create dummy files to build dependencies
 RUN mkdir -p crates/rust-hsm-core/src && \
