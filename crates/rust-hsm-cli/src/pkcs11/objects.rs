@@ -3,13 +3,66 @@ use cryptoki::object::{Attribute, AttributeType, KeyType, ObjectClass};
 use cryptoki::session::UserType;
 use cryptoki::slot::Slot;
 use cryptoki::types::AuthPin;
+use serde::{Serialize, Deserialize};
 use tracing::{debug, info, trace};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ObjectInfo {
+    pub handle: String,
+    pub label: String,
+    pub class: String,
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_size_bits: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flags: Option<ObjectFlags>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ObjectFlags {
+    pub token: bool,
+    pub private: bool,
+    pub modifiable: bool,
+    pub local: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sign: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verify: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encrypt: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decrypt: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wrap: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unwrap: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derive: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sensitive: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub always_sensitive: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub never_extractable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extractable: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListObjectsOutput {
+    pub token_label: String,
+    pub object_count: usize,
+    pub objects: Vec<ObjectInfo>,
+}
 
 pub fn list_objects(
     module_path: &str,
     label: &str,
     user_pin: &str,
     detailed: bool,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -44,7 +97,21 @@ pub fn list_objects(
     debug!("Found {} objects", objects.len());
     trace!("Object handles: {:?}", objects);
 
-    if objects.is_empty() {
+    if json {
+        // JSON output
+        let object_infos: Vec<ObjectInfo> = objects
+            .iter()
+            .filter_map(|obj| extract_object_info(&session, *obj, detailed))
+            .collect();
+
+        let output = ListObjectsOutput {
+            token_label: label.to_string(),
+            object_count: object_infos.len(),
+            objects: object_infos,
+        };
+
+        println!("{}", serde_json::to_string_pretty(&output)?);
+    } else if objects.is_empty() {
         println!("No objects found.");
     } else {
         if detailed {
@@ -296,4 +363,145 @@ fn find_token_slot(pkcs11: &Pkcs11, label: &str) -> anyhow::Result<Slot> {
     }
 
     anyhow::bail!("Token '{}' not found", label)
+}
+
+fn extract_object_info(
+    session: &cryptoki::session::Session,
+    obj: cryptoki::object::ObjectHandle,
+    detailed: bool,
+) -> Option<ObjectInfo> {
+    let attrs = if detailed {
+        session.get_attributes(
+            obj,
+            &[
+                AttributeType::Label,
+                AttributeType::Class,
+                AttributeType::Id,
+                AttributeType::KeyType,
+                AttributeType::Token,
+                AttributeType::Private,
+                AttributeType::Modifiable,
+                AttributeType::Local,
+                AttributeType::Sensitive,
+                AttributeType::AlwaysSensitive,
+                AttributeType::NeverExtractable,
+                AttributeType::Extractable,
+                AttributeType::Sign,
+                AttributeType::Verify,
+                AttributeType::Encrypt,
+                AttributeType::Decrypt,
+                AttributeType::Wrap,
+                AttributeType::Unwrap,
+                AttributeType::Derive,
+                AttributeType::ModulusBits,
+                AttributeType::ValueLen,
+            ],
+        )
+    } else {
+        session.get_attributes(
+            obj,
+            &[
+                AttributeType::Label,
+                AttributeType::Class,
+                AttributeType::Id,
+                AttributeType::KeyType,
+            ],
+        )
+    }
+    .ok()?;
+
+    let mut label = String::new();
+    let mut class = String::new();
+    let mut id = String::new();
+    let mut key_type: Option<String> = None;
+    let mut key_size: Option<usize> = None;
+    
+    let mut token = false;
+    let mut private = false;
+    let mut modifiable = false;
+    let mut local = false;
+    let mut sign: Option<bool> = None;
+    let mut verify: Option<bool> = None;
+    let mut encrypt: Option<bool> = None;
+    let mut decrypt: Option<bool> = None;
+    let mut wrap: Option<bool> = None;
+    let mut unwrap: Option<bool> = None;
+    let mut derive: Option<bool> = None;
+    let mut sensitive: Option<bool> = None;
+    let mut always_sensitive: Option<bool> = None;
+    let mut never_extractable: Option<bool> = None;
+    let mut extractable: Option<bool> = None;
+
+    for attr in attrs {
+        match attr {
+            Attribute::Label(bytes) => {
+                label = String::from_utf8(bytes).unwrap_or_default();
+            }
+            Attribute::Class(cls) => {
+                class = format!("{:?}", cls);
+            }
+            Attribute::Id(bytes) => {
+                id = hex::encode(bytes);
+            }
+            Attribute::KeyType(ktype) => {
+                key_type = Some(format!("{:?}", ktype));
+            }
+            Attribute::Token(val) => token = val,
+            Attribute::Private(val) => private = val,
+            Attribute::Modifiable(val) => modifiable = val,
+            Attribute::Local(val) => local = val,
+            Attribute::Sign(val) => sign = Some(val),
+            Attribute::Verify(val) => verify = Some(val),
+            Attribute::Encrypt(val) => encrypt = Some(val),
+            Attribute::Decrypt(val) => decrypt = Some(val),
+            Attribute::Wrap(val) => wrap = Some(val),
+            Attribute::Unwrap(val) => unwrap = Some(val),
+            Attribute::Derive(val) => derive = Some(val),
+            Attribute::Sensitive(val) => sensitive = Some(val),
+            Attribute::AlwaysSensitive(val) => always_sensitive = Some(val),
+            Attribute::NeverExtractable(val) => never_extractable = Some(val),
+            Attribute::Extractable(val) => extractable = Some(val),
+            Attribute::ModulusBits(bits) => {
+                key_size = Some(usize::from(bits));
+            }
+            Attribute::ValueLen(len) => {
+                if key_size.is_none() {
+                    key_size = Some(usize::from(len) * 8);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let flags = if detailed {
+        Some(ObjectFlags {
+            token,
+            private,
+            modifiable,
+            local,
+            sign,
+            verify,
+            encrypt,
+            decrypt,
+            wrap,
+            unwrap,
+            derive,
+            sensitive,
+            always_sensitive,
+            never_extractable,
+            extractable,
+        })
+    } else {
+        None
+    };
+
+    Some(ObjectInfo {
+        handle: format!("{:?}", obj),
+        label,
+        class,
+        id,
+        key_type,
+        key_size_bits: key_size,
+        flags,
+    })
 }

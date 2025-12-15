@@ -19,7 +19,11 @@ pub enum Commands {
     Info,
 
     /// List all available slots and tokens
-    ListSlots,
+    ListSlots {
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
 
     /// List supported mechanisms for a slot
     ListMechanisms {
@@ -29,6 +33,9 @@ pub enum Commands {
         /// Show detailed mechanism capabilities (encrypt, decrypt, sign, verify, etc.)
         #[arg(long)]
         detailed: bool,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
     },
 
     /// Initialize a token
@@ -85,6 +92,9 @@ pub enum Commands {
         /// Show detailed object attributes (type, flags, key size)
         #[arg(long)]
         detailed: bool,
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
     },
 
     /// Generate a keypair on the token

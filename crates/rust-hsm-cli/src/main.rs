@@ -58,11 +58,15 @@ fn main() -> anyhow::Result<()> {
         Commands::Info => {
             pkcs11::info::display_info(&module_path)?;
         }
-        Commands::ListSlots => {
-            pkcs11::slots::list_slots(&module_path)?;
+        Commands::ListSlots { json } => {
+            pkcs11::slots::list_slots(&module_path, json)?;
         }
-        Commands::ListMechanisms { slot, detailed } => {
-            pkcs11::info::list_mechanisms(&module_path, slot, detailed)?;
+        Commands::ListMechanisms {
+            slot,
+            detailed,
+            json,
+        } => {
+            pkcs11::info::list_mechanisms(&module_path, slot, detailed, json)?;
         }
         Commands::InitToken {
             label,
@@ -121,6 +125,7 @@ fn main() -> anyhow::Result<()> {
             user_pin,
             pin_stdin,
             detailed,
+            json,
         } => {
             let token_label = config
                 .token_label(label.as_deref())
@@ -130,7 +135,13 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::objects::list_objects(&module_path, &token_label, &user_pin_value, detailed)?;
+            pkcs11::objects::list_objects(
+                &module_path,
+                &token_label,
+                &user_pin_value,
+                detailed,
+                json,
+            )?;
         }
         Commands::GenKeypair {
             label,

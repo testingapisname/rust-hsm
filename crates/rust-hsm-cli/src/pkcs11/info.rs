@@ -1,7 +1,40 @@
 use super::mechanisms;
 use cryptoki::context::{CInitializeArgs, Pkcs11};
 use cryptoki::mechanism::MechanismInfo;
+use serde::{Serialize, Deserialize};
 use tracing::{debug, trace};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MechanismOutput {
+    pub value: u64,
+    pub name: String,
+    pub category: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<MechanismCapabilities>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MechanismCapabilities {
+    pub encrypt: bool,
+    pub decrypt: bool,
+    pub digest: bool,
+    pub sign: bool,
+    pub sign_recover: bool,
+    pub verify: bool,
+    pub verify_recover: bool,
+    pub generate: bool,
+    pub generate_key_pair: bool,
+    pub wrap: bool,
+    pub unwrap: bool,
+    pub derive: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListMechanismsOutput {
+    pub slot_id: u64,
+    pub mechanism_count: usize,
+    pub mechanisms: Vec<MechanismOutput>,
+}
 
 pub fn display_info(module_path: &str) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
@@ -35,6 +68,7 @@ pub fn list_mechanisms(
     module_path: &str,
     slot_id: Option<u64>,
     detailed: bool,
+    json: bool,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module from: {}", module_path);
     let pkcs11 = Pkcs11::new(module_path)?;
@@ -59,86 +93,142 @@ pub fn list_mechanisms(
         &slots[0]
     };
 
-    println!("\n=== Mechanisms for Slot {} ===", target_slot.id());
-
     let mechanisms = pkcs11.get_mechanism_list(*target_slot)?;
 
-    println!("Total mechanisms supported: {}\n", mechanisms.len());
+    if json {
+        // JSON output
+        let mut mechanism_outputs = Vec::new();
 
-    if detailed {
-        println!("Mechanism capabilities:");
-        println!("  enc=encrypt, dec=decrypt, sig=sign, vfy=verify, hsh=digest,");
-        println!("  gkp=gen keypair, wra=wrap, unw=unwrap, der=derive\n");
-    }
-
-    // Extract mechanism values and lookup names
-    use std::collections::HashMap;
-    let mut by_category: HashMap<&str, Vec<(u64, String, Option<MechanismInfo>)>> = HashMap::new();
-
-    for mech in mechanisms.iter() {
-        let mech_str = format!("{:?}", mech);
-        // Extract numeric value from "MechanismType { val: 1234 }" format
-        let val = if let Some(start) = mech_str.find("val: ") {
-            let val_str = &mech_str[start + 5..];
-            let end = val_str.find(' ').unwrap_or(val_str.len());
-            val_str[..end].trim_end_matches('}').parse::<u64>().ok()
-        } else {
-            None
-        };
-
-        if let Some(val) = val {
-            let name = mechanisms::mechanism_name(val)
-                .unwrap_or("Unknown")
-                .to_string();
-            let category = mechanisms::mechanism_category(val);
-
-            // Get mechanism info if detailed output requested
-            let mech_info = if detailed {
-                pkcs11.get_mechanism_info(*target_slot, *mech).ok()
+        for mech in mechanisms.iter() {
+            let mech_str = format!("{:?}", mech);
+            let val = if let Some(start) = mech_str.find("val: ") {
+                let val_str = &mech_str[start + 5..];
+                let end = val_str.find(' ').unwrap_or(val_str.len());
+                val_str[..end].trim_end_matches('}').parse::<u64>().ok()
             } else {
                 None
             };
 
-            by_category
-                .entry(category)
-                .or_insert_with(Vec::new)
-                .push((val, name, mech_info));
-        }
-    }
+            if let Some(val) = val {
+                let name = mechanisms::mechanism_name(val)
+                    .unwrap_or("Unknown")
+                    .to_string();
+                let category = mechanisms::mechanism_category(val).to_string();
 
-    // Sort categories and display
-    let mut categories: Vec<_> = by_category.keys().collect();
-    categories.sort();
-
-    for category in categories {
-        let mut mechs = by_category.get(category).unwrap().clone();
-        mechs.sort_by_key(|(val, _, _)| *val);
-
-        println!("{} ({} mechanisms):", category, mechs.len());
-        for (val, name, mech_info) in mechs {
-            if detailed {
-                if let Some(info) = mech_info {
-                    let flags = format_mechanism_flags(&info);
-                    let name_display = if name == "Unknown" {
-                        format!("0x{:08x}", val)
-                    } else {
-                        format!("{:<42}", name)
-                    };
-                    println!("  {:<42} {}", name_display, flags);
-                } else if name == "Unknown" {
-                    println!("  0x{:08x} - {}", val, name);
+                let capabilities = if detailed {
+                    pkcs11.get_mechanism_info(*target_slot, *mech).ok().map(|info| {
+                        MechanismCapabilities {
+                            encrypt: info.encrypt(),
+                            decrypt: info.decrypt(),
+                            digest: info.digest(),
+                            sign: info.sign(),
+                            sign_recover: info.sign_recover(),
+                            verify: info.verify(),
+                            verify_recover: info.verify_recover(),
+                            generate: info.generate(),
+                            generate_key_pair: info.generate_key_pair(),
+                            wrap: info.wrap(),
+                            unwrap: info.unwrap(),
+                            derive: info.derive(),
+                        }
+                    })
                 } else {
-                    println!("  {:<42} (info unavailable)", name);
-                }
-            } else {
-                if name == "Unknown" {
-                    println!("  0x{:08x} - {}", val, name);
-                } else {
-                    println!("  {} (0x{:04x})", name, val);
-                }
+                    None
+                };
+
+                mechanism_outputs.push(MechanismOutput {
+                    value: val,
+                    name,
+                    category,
+                    capabilities,
+                });
             }
         }
-        println!();
+
+        let output = ListMechanismsOutput {
+            slot_id: target_slot.id(),
+            mechanism_count: mechanism_outputs.len(),
+            mechanisms: mechanism_outputs,
+        };
+
+        println!("{}", serde_json::to_string_pretty(&output)?);
+    } else {
+        println!("\n=== Mechanisms for Slot {} ===", target_slot.id());
+        println!("Total mechanisms supported: {}\n", mechanisms.len());
+
+        if detailed {
+            println!("Mechanism capabilities:");
+            println!("  enc=encrypt, dec=decrypt, sig=sign, vfy=verify, hsh=digest,");
+            println!("  gkp=gen keypair, wra=wrap, unw=unwrap, der=derive\n");
+        }
+
+        // Extract mechanism values and lookup names
+        use std::collections::HashMap;
+        let mut by_category: HashMap<&str, Vec<(u64, String, Option<MechanismInfo>)>> =
+            HashMap::new();
+
+        for mech in mechanisms.iter() {
+            let mech_str = format!("{:?}", mech);
+            let val = if let Some(start) = mech_str.find("val: ") {
+                let val_str = &mech_str[start + 5..];
+                let end = val_str.find(' ').unwrap_or(val_str.len());
+                val_str[..end].trim_end_matches('}').parse::<u64>().ok()
+            } else {
+                None
+            };
+
+            if let Some(val) = val {
+                let name = mechanisms::mechanism_name(val)
+                    .unwrap_or("Unknown")
+                    .to_string();
+                let category = mechanisms::mechanism_category(val);
+
+                let mech_info = if detailed {
+                    pkcs11.get_mechanism_info(*target_slot, *mech).ok()
+                } else {
+                    None
+                };
+
+                by_category
+                    .entry(category)
+                    .or_insert_with(Vec::new)
+                    .push((val, name, mech_info));
+            }
+        }
+
+        let mut categories: Vec<_> = by_category.keys().collect();
+        categories.sort();
+
+        for category in categories {
+            let mut mechs = by_category.get(category).unwrap().clone();
+            mechs.sort_by_key(|(val, _, _)| *val);
+
+            println!("{} ({} mechanisms):", category, mechs.len());
+            for (val, name, mech_info) in mechs {
+                if detailed {
+                    if let Some(info) = mech_info {
+                        let flags = format_mechanism_flags(&info);
+                        let name_display = if name == "Unknown" {
+                            format!("0x{:08x}", val)
+                        } else {
+                            format!("{:<42}", name)
+                        };
+                        println!("  {:<42} {}", name_display, flags);
+                    } else if name == "Unknown" {
+                        println!("  0x{:08x} - {}", val, name);
+                    } else {
+                        println!("  {:<42} (info unavailable)", name);
+                    }
+                } else {
+                    if name == "Unknown" {
+                        println!("  0x{:08x} - {}", val, name);
+                    } else {
+                        println!("  {} (0x{:04x})", name, val);
+                    }
+                }
+            }
+            println!();
+        }
     }
 
     pkcs11.finalize();
