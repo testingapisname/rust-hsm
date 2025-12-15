@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/rust-hsm-core",
+    "crates/rust-hsm-cli",
+]
+resolver = "2"

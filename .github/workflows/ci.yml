@@ -42,13 +42,13 @@ jobs:
           key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Run cargo check
-        run: cd crates/rust-hsm-cli && cargo check --all-features
+        run: cargo check --all-features --workspace
       
       - name: Run cargo fmt
-        run: cd crates/rust-hsm-cli && cargo fmt --all -- --check
+        run: cargo fmt --all -- --check
       
       - name: Run cargo clippy
-        run: cd crates/rust-hsm-cli && cargo clippy --all-features -- -D warnings
+        run: cargo clippy --all-features --workspace -- -D warnings
 
   # Unit tests (no HSM required)
   test:
@@ -70,11 +70,16 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
+      - name: Install SoftHSM2 (for compilation)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y softhsm2 libsofthsm2-dev
+      
       - name: Run unit tests
-        run: cd crates/rust-hsm-cli && cargo test --bins
+        run: cargo test --workspace --bins
       
       - name: Run doc tests
-        run: cd crates/rust-hsm-cli && cargo test --doc || echo "No doc tests available"
+        run: cargo test --workspace --doc || echo "No doc tests available"
 
   # Docker build and integration tests
   integration:
@@ -90,22 +95,12 @@ jobs:
       - name: Build Docker image
         run: docker compose build
       
-      - name: Start container
-        run: docker compose up -d
-      
-      - name: Wait for container
-        run: sleep 5
-      
       - name: Run full integration test suite
-        run: docker exec rust-hsm-app bash /app/test.sh
+        run: docker compose run --rm app /app/test.sh
       
       - name: Show logs on failure
         if: failure()
         run: docker compose logs
-      
-      - name: Stop container
-        if: always()
-        run: docker compose down
 
   # Security audit
   security:
@@ -121,7 +116,7 @@ jobs:
         run: cargo install cargo-audit
       
       - name: Run security audit
-        run: cd crates/rust-hsm-cli && cargo audit
+        run: cargo audit --workspace
 
   # Code coverage
   coverage:
@@ -143,13 +138,16 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
+      - name: Install SoftHSM2 (for compilation)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y softhsm2 libsofthsm2-dev
+      
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
       
       - name: Generate coverage
-        run: |
-          cd crates/rust-hsm-cli
-          cargo tarpaulin --out Xml --output-dir ../../coverage
+        run: cargo tarpaulin --workspace --out Xml --output-dir coverage
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
