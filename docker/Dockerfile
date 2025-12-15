@@ -12,11 +12,11 @@ COPY crates/rust-hsm-core/Cargo.toml crates/rust-hsm-core/Cargo.toml
 COPY crates/rust-hsm-cli/Cargo.toml crates/rust-hsm-cli/Cargo.toml
 
 # Create dummy files with proper module structure to build dependencies
-RUN mkdir -p crates/rust-hsm-core/src && \
+RUN mkdir -p crates/rust-hsm-core/src/keys && \
     echo "pub mod audit; pub mod benchmark; pub mod errors; pub mod info; pub mod keys; pub mod mechanisms; pub mod objects; pub mod random; pub mod slots; pub mod token; pub mod troubleshoot;" > crates/rust-hsm-core/src/lib.rs && \
-    mkdir -p crates/rust-hsm-core/src/keys && \
-    touch crates/rust-hsm-core/src/{audit.rs,benchmark.rs,errors.rs,info.rs,mechanisms.rs,objects.rs,random.rs,slots.rs,token.rs,troubleshoot.rs} && \
-    touch crates/rust-hsm-core/src/keys/{mod.rs,asymmetric.rs,csr.rs,export.rs,hash.rs,hmac.rs,keypair.rs,symmetric.rs,utils.rs,wrap.rs} && \
+    for f in audit benchmark errors info mechanisms objects random slots token troubleshoot; do echo "pub fn dummy() {}" > crates/rust-hsm-core/src/$f.rs; done && \
+    echo "pub mod asymmetric; pub mod csr; pub mod export; pub mod hash; pub mod hmac; pub mod keypair; pub mod symmetric; pub mod utils; pub mod wrap;" > crates/rust-hsm-core/src/keys/mod.rs && \
+    for f in asymmetric csr export hash hmac keypair symmetric utils wrap; do echo "pub fn dummy() {}" > crates/rust-hsm-core/src/keys/$f.rs; done && \
     mkdir -p crates/rust-hsm-cli/src && \
     echo "fn main() {}" > crates/rust-hsm-cli/src/main.rs && \
     cargo build --release && \
