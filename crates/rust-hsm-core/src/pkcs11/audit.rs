@@ -253,7 +253,7 @@ fn audit_keys_internal(
         for issue in &issues {
             issues_by_key
                 .entry(issue.key_label.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(issue);
         }
 
@@ -417,7 +417,7 @@ fn determine_key_type(
         match kt {
             KeyType::RSA => {
                 if let Some(bits) = modulus_bits {
-                    format!("RSA-{}", *bits as u64)
+                    format!("RSA-{}", *bits)
                 } else {
                     "RSA".to_string()
                 }
@@ -437,7 +437,7 @@ fn determine_key_type(
             }
             KeyType::AES => {
                 if let Some(len) = value_len {
-                    format!("AES-{}", (*len as u64) * 8)
+                    format!("AES-{}", *len * 8)
                 } else {
                     "AES".to_string()
                 }

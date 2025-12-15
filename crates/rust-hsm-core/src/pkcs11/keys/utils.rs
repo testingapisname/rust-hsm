@@ -36,22 +36,7 @@ pub fn find_token_slot(pkcs11: &Pkcs11, label: &str) -> anyhow::Result<Slot> {
     anyhow::bail!("Token with label '{}' not found", label)
 }
 
-pub(super) fn find_key_by_label(
-    session: &Session,
-    label: &str,
-    class: cryptoki::object::ObjectClass,
-) -> anyhow::Result<ObjectHandle> {
-    let template = vec![
-        Attribute::Class(class),
-        Attribute::Label(label.as_bytes().to_vec()),
-    ];
 
-    session
-        .find_objects(&template)?
-        .first()
-        .copied()
-        .ok_or_else(|| anyhow::anyhow!("Key '{}' not found", label))
-}
 
 pub(super) fn get_key_type(
     session: &Session,

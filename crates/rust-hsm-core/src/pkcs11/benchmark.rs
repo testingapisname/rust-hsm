@@ -165,6 +165,7 @@ fn get_system_info() -> SystemInfo {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_full_benchmark(
     module_path: &str,
     token_label: &str,
@@ -620,17 +621,17 @@ fn detect_key_type(session: &cryptoki::session::Session, label: &str) -> Result<
 
         for attr in &attrs {
             if let Attribute::KeyType(key_type) = attr {
-                match key_type {
-                    &KeyType::RSA => {
+                match *key_type {
+                    KeyType::RSA => {
                         // Get modulus bits
                         for attr in &attrs {
                             if let Attribute::ModulusBits(bits) = attr {
-                                return Ok(format!("RSA-{}", bits.to_string()));
+                                return Ok(format!("RSA-{}", bits));
                             }
                         }
                         return Ok("RSA".to_string());
                     }
-                    &KeyType::EC => {
+                    KeyType::EC => {
                         // Try to determine curve
                         let ec_attrs = session
                             .get_attributes(key, &[cryptoki::object::AttributeType::EcParams])?;
@@ -659,9 +660,9 @@ fn detect_key_type(session: &cryptoki::session::Session, label: &str) -> Result<
         let attrs = session.get_attributes(key, &[cryptoki::object::AttributeType::KeyType])?;
         for attr in &attrs {
             if let Attribute::KeyType(key_type) = attr {
-                match key_type {
-                    &KeyType::AES => return Ok("AES".to_string()),
-                    &KeyType::GENERIC_SECRET => return Ok("GENERIC_SECRET".to_string()),
+                match *key_type {
+                    KeyType::AES => return Ok("AES".to_string()),
+                    KeyType::GENERIC_SECRET => return Ok("GENERIC_SECRET".to_string()),
                     _ => return Ok(format!("{:?}", key_type)),
                 }
             }
@@ -1172,7 +1173,7 @@ fn write_csv_data<W: std::io::Write>(
     results: &[BenchmarkResult],
 ) -> Result<()> {
     // Write header
-    wtr.write_record(&[
+    wtr.write_record([
         "operation",
         "iterations",
         "warmup_iterations",
@@ -1333,6 +1334,7 @@ fn bench_aes_encrypt_size(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn bench_hash_size(
     session: &cryptoki::session::Session,
     name: &str,

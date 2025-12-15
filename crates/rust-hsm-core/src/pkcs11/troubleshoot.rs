@@ -781,8 +781,8 @@ pub fn diff_keys(
     // Build comparison table
     if !json {
         println!(
-            "{:<30} {:<20} {:<20} {}",
-            "Attribute", "Key 1", "Key 2", "Status"
+            "{:<30} {:<20} {:<20} Status",
+            "Attribute", "Key 1", "Key 2"
         );
         println!("{}", "─".repeat(80));
     }
@@ -856,11 +856,10 @@ pub fn diff_keys(
             "differences": diff_details
         });
         println!("{}", serde_json::to_string_pretty(&json_output)?);
+    } else if differences.is_empty() {
+        println!("\n✓ Keys are identical in all checked attributes");
     } else {
-        if differences.is_empty() {
-            println!("\n✓ Keys are identical in all checked attributes");
-        } else {
-            println!("\n✗ Found {} difference(s):\n", differences.len());
+        println!("\n✗ Found {} difference(s):\n", differences.len());
 
             for (attr, val1, val2) in &differences {
                 let (severity, explanation) = match attr.as_str() {
@@ -890,9 +889,8 @@ pub fn diff_keys(
                     val1,
                     val2
                 );
-                println!("  → {}", explanation);
-                println!();
-            }
+            println!("  → {}", explanation);
+            println!();
         }
     }
 

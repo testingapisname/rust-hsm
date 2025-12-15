@@ -7,6 +7,7 @@ use tracing::{debug, info};
 
 use super::utils::{find_token_slot, mechanism_name};
 
+#[allow(clippy::too_many_arguments)]
 pub fn gen_keypair(
     module_path: &str,
     label: &str,

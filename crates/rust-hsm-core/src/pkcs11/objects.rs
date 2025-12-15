@@ -113,50 +113,48 @@ pub fn list_objects(
         println!("{}", serde_json::to_string_pretty(&output)?);
     } else if objects.is_empty() {
         println!("No objects found.");
-    } else {
-        if detailed {
-            // Detailed output like p11ls
-            for obj in &objects {
-                if let Some(details) = get_detailed_object_info(&session, *obj) {
-                    println!("{}", details);
-                }
+    } else if detailed {
+        // Detailed output like p11ls
+        for obj in &objects {
+            if let Some(details) = get_detailed_object_info(&session, *obj) {
+                println!("{}", details);
             }
-        } else {
-            // Simple output
-            for (idx, obj) in objects.iter().enumerate() {
-                debug!("Retrieving attributes for object {}: {:?}", idx + 1, obj);
-                println!("\nObject {}:", idx + 1);
+        }
+    } else {
+        // Simple output
+        for (idx, obj) in objects.iter().enumerate() {
+            debug!("Retrieving attributes for object {}: {:?}", idx + 1, obj);
+            println!("\nObject {}:", idx + 1);
 
-                // Try to get common attributes
-                debug!("→ Calling C_GetAttributeValue");
-                if let Ok(attrs) = session.get_attributes(
-                    *obj,
-                    &[
-                        AttributeType::Label,
-                        AttributeType::Class,
-                        AttributeType::Id,
-                    ],
-                ) {
-                    trace!("Retrieved {} attributes", attrs.len());
-                    for attr in attrs {
-                        match attr {
-                            Attribute::Label(bytes) => {
-                                if let Ok(label) = String::from_utf8(bytes) {
-                                    println!("  Label: {}", label);
-                                }
+            // Try to get common attributes
+            debug!("→ Calling C_GetAttributeValue");
+            if let Ok(attrs) = session.get_attributes(
+                *obj,
+                &[
+                    AttributeType::Label,
+                    AttributeType::Class,
+                    AttributeType::Id,
+                ],
+            ) {
+                trace!("Retrieved {} attributes", attrs.len());
+                for attr in attrs {
+                    match attr {
+                        Attribute::Label(bytes) => {
+                            if let Ok(label) = String::from_utf8(bytes) {
+                                println!("  Label: {}", label);
                             }
-                            Attribute::Class(class) => {
-                                println!("  Class: {:?}", class);
-                            }
-                            Attribute::Id(id) => {
-                                println!("  ID: {}", hex::encode(id));
-                            }
-                            _ => {}
                         }
+                        Attribute::Class(class) => {
+                            println!("  Class: {:?}", class);
+                        }
+                        Attribute::Id(id) => {
+                            println!("  ID: {}", hex::encode(id));
+                        }
+                        _ => {}
                     }
-                } else {
-                    debug!("Failed to retrieve attributes for object {:?}", obj);
                 }
+            } else {
+                debug!("Failed to retrieve attributes for object {:?}", obj);
             }
         }
     }

@@ -177,6 +177,7 @@ pub fn list_mechanisms(
 
         // Extract mechanism values and lookup names
         use std::collections::HashMap;
+        #[allow(clippy::type_complexity)]
         let mut by_category: HashMap<&str, Vec<(u64, String, Option<MechanismInfo>)>> =
             HashMap::new();
 
@@ -204,7 +205,7 @@ pub fn list_mechanisms(
 
                 by_category
                     .entry(category)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((val, name, mech_info));
             }
         }
@@ -232,12 +233,10 @@ pub fn list_mechanisms(
                     } else {
                         println!("  {:<42} (info unavailable)", name);
                     }
+                } else if name == "Unknown" {
+                    println!("  0x{:08x} - {}", val, name);
                 } else {
-                    if name == "Unknown" {
-                        println!("  0x{:08x} - {}", val, name);
-                    } else {
-                        println!("  {} (0x{:04x})", name, val);
-                    }
+                    println!("  {} (0x{:04x})", name, val);
                 }
             }
             println!();

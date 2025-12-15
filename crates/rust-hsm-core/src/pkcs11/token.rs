@@ -126,7 +126,7 @@ pub fn delete_token(module_path: &str, label: &str, so_pin: &str) -> anyhow::Res
     // Try SoftHSM-specific deletion first (actually removes token files)
     debug!("Attempting SoftHSM-specific token deletion with softhsm2-util");
     if let Ok(output) = std::process::Command::new("softhsm2-util")
-        .args(&["--delete-token", "--token", label])
+        .args(["--delete-token", "--token", label])
         .output()
     {
         if output.status.success() {
