@@ -1,31 +1,22 @@
-# Multi-stage build: compile Rust, then create slim runtime with SoftHSM2
+# Multi-stage build: compile Rust with cargo-chef, then create slim runtime with SoftHSM2
 
-FROM rust:1.83-bookworm AS builder
-
+FROM rust:1.83-bookworm AS chef
+RUN cargo install cargo-chef
 WORKDIR /build
 
-# Copy workspace configuration first
-COPY Cargo.toml ./
+# Analyze dependencies
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-# Copy Cargo files for both crates (for layer caching)
-COPY crates/rust-hsm-core/Cargo.toml crates/rust-hsm-core/Cargo.toml
-COPY crates/rust-hsm-cli/Cargo.toml crates/rust-hsm-cli/Cargo.toml
+# Build dependencies (cached layer)
+FROM chef AS builder
+COPY --from=planner /build/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 
-# Create dummy files to build dependencies
-RUN mkdir -p crates/rust-hsm-core/src && \
-    echo "pub mod audit; pub mod benchmark; pub mod errors; pub mod info; pub mod keys; pub mod mechanisms; pub mod objects; pub mod random; pub mod slots; pub mod token; pub mod troubleshoot;" > crates/rust-hsm-core/src/lib.rs && \
-    mkdir -p crates/rust-hsm-core/src/{keys,pkcs11} && \
-    touch crates/rust-hsm-core/src/{audit.rs,benchmark.rs,errors.rs,info.rs,mechanisms.rs,objects.rs,random.rs,slots.rs,token.rs,troubleshoot.rs} && \
-    touch crates/rust-hsm-core/src/keys/{mod.rs,asymmetric.rs,csr.rs,export.rs,hash.rs,hmac.rs,keypair.rs,symmetric.rs,utils.rs,wrap.rs} && \
-    mkdir -p crates/rust-hsm-cli/src && \
-    echo "fn main() {}" > crates/rust-hsm-cli/src/main.rs && \
-    cargo build --release && \
-    rm -rf target/release/deps/rust_hsm_cli* target/release/deps/rust_hsm_core*
-
-# Copy source and build actual binaries
-COPY crates/rust-hsm-core/src crates/rust-hsm-core/src
-COPY crates/rust-hsm-cli/src crates/rust-hsm-cli/src
-RUN cd crates/rust-hsm-cli && cargo build --release
+# Build application
+COPY . .
+RUN cargo build --release --bin rust-hsm-cli
 
 # Run tests
 RUN cd crates/rust-hsm-cli && cargo test --release
