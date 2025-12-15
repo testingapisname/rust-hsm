@@ -1,6 +1,6 @@
 #!/bin/bash
 # cleanup-test-tokens.sh
-# Deletes all SoftHSM tokens with "test" or "TEST" in their label
+# Deletes all SoftHSM tokens with "test", "TEST", "demo", or "DEMO" in their label
 
 set -e
 
@@ -17,13 +17,13 @@ fi
 # Default SO PIN (can be overridden with environment variable)
 SO_PIN="${SO_PIN:-test-so-1234}"
 
-echo "Scanning for test tokens..."
+echo "Scanning for test/demo tokens..."
 echo ""
 
 # Get list of all slots with tokens
 SLOTS_OUTPUT=$(rust-hsm-cli list-slots 2>/dev/null)
 
-# Extract slot, label, and serial for tokens containing "test" (case-insensitive)
+# Extract slot, label, and serial for tokens containing "test" or "demo" (case-insensitive)
 # Use only the "Initialized Slots" section to avoid duplicates
 TEST_TOKENS=$(echo "$SLOTS_OUTPUT" | awk '
     /^=== Initialized Slots ===/ { in_init=1; next }
@@ -32,20 +32,20 @@ TEST_TOKENS=$(echo "$SLOTS_OUTPUT" | awk '
     in_init && /Token Label:/ { label=$NF }
     in_init && /Token Serial:/ { 
         serial=$NF
-        if (tolower(label) ~ /test/) {
+        if (tolower(label) ~ /test/ || tolower(label) ~ /demo/) {
             print slot ":" label ":" serial
         }
     }
 ' | sort -u -t: -k3 || true)
 
 if [ -z "$TEST_TOKENS" ]; then
-    echo "✓ No test tokens found"
+    echo "✓ No test/demo tokens found"
     exit 0
 fi
 
 # Count tokens
 TOKEN_COUNT=$(echo "$TEST_TOKENS" | wc -l)
-echo "Found $TOKEN_COUNT test token(s) to delete:"
+echo "Found $TOKEN_COUNT test/demo token(s) to delete:"
 echo ""
 
 # Show what will be deleted
