@@ -3,6 +3,9 @@
 //! This library provides a high-level interface to PKCS#11 Hardware Security Modules (HSMs).
 //! It handles token management, key generation, cryptographic operations, and more.
 //!
+//! Built on top of [cryptoki](https://crates.io/crates/cryptoki), the Rust PKCS#11 bindings,
+//! this library provides a more ergonomic API focused on common HSM workflows.
+//!
 //! ## Features
 //!
 //! - **Token Management**: Initialize tokens, manage PINs
@@ -12,6 +15,7 @@
 //! - **Object Inspection**: List and inspect HSM objects with detailed attributes
 //! - **Mechanism Discovery**: Query supported PKCS#11 mechanisms
 //! - **JSON Serialization**: Export data in machine-parseable format
+//! - **Troubleshooting**: Error explanations, key search, and comparison tools
 //!
 //! ## Example
 //!
