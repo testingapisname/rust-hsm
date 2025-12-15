@@ -73,6 +73,33 @@ docker exec rust-hsm-app rust-hsm-cli explain-error CKR_SESSION_COUNT
 
 ---
 
+#### Scenario: "Accumulated test tokens/slots"
+**Symptoms**: Many test tokens visible in `list-slots`, slot IDs keep growing
+
+**Diagnosis**:
+```bash
+# List all slots to see accumulated tokens
+docker exec rust-hsm-app rust-hsm-cli list-slots | grep -i test
+```
+
+**Solution**:
+```bash
+# Run cleanup script to remove all test tokens automatically
+docker exec -e AUTO_CONFIRM=yes rust-hsm-app /app/cleanup-test-tokens.sh
+
+# Or run interactively for confirmation
+docker exec -it rust-hsm-app /app/cleanup-test-tokens.sh
+
+# For complete reset (deletes all tokens and slots)
+docker compose down
+docker volume rm rust-hsm_tokens
+docker compose up -d
+```
+
+**Note**: The integration test suite (`/app/test.sh`) now automatically runs cleanup after tests complete, preventing token accumulation during normal testing.
+
+---
+
 ### 2. PIN & Authentication Issues
 
 #### Scenario: "PIN incorrect"

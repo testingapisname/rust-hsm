@@ -37,8 +37,9 @@ COPY --from=builder /build/crates/rust-hsm-cli/target/release/rust-hsm-cli /usr/
 COPY docker/softhsm2.conf /etc/softhsm2.conf
 COPY docker/entrypoint.sh /entrypoint.sh
 COPY test.sh /app/test.sh
+COPY cleanup-test-tokens.sh /app/cleanup-test-tokens.sh
 COPY config.example.toml /app/.rust-hsm.toml
-RUN chmod +x /entrypoint.sh /app/test.sh
+RUN chmod +x /entrypoint.sh /app/test.sh /app/cleanup-test-tokens.sh
 
 # Set environment variables
 ENV SOFTHSM2_CONF=/etc/softhsm2.conf

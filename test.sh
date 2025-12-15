@@ -8,8 +8,8 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Use unique token name to avoid conflicts
-TEST_TOKEN="TEST_TOKEN_$(date +%s)"
+# Use fixed token name (cleanup script will remove it after tests)
+TEST_TOKEN="TEST_TOKEN"
 SO_PIN="test-so-1234"
 USER_PIN="test-user-123456"
 TEST_KEY="test-key"
@@ -431,3 +431,9 @@ $CLI diff-keys --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key1-label "compar
 
 echo -e "\n${GREEN}=== All tests passed! ===${NC}"
 
+# Run cleanup script to remove all test tokens
+echo ""
+echo "Running cleanup to remove old test tokens..."
+if [ -f /app/cleanup-test-tokens.sh ]; then
+    AUTO_CONFIRM=yes bash /app/cleanup-test-tokens.sh
+fi
