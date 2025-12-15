@@ -4,26 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rust-hsm-core = { path = "../rust-hsm-core" }
 clap = { version = "4.5", features = ["derive"] }
-cryptoki = "0.10"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1.0"
-thiserror = "1.0"
-hex = "0.4"
-sha2 = "0.10"
-base64 = "0.22"
-rand = "0.8"
-simple_asn1 = "0.6"
-num-bigint = "0.4"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 toml = "0.8"
 dirs = "5.0"
-csv = "1.3"
-indicatif = "0.17"
-chrono = { version = "0.4", features = ["serde"] }
-sysinfo = "0.32"
+serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 tempfile = "3.13"

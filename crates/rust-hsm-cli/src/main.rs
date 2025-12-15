@@ -21,7 +21,6 @@ use tracing_subscriber::EnvFilter;
 
 mod cli;
 mod config;
-mod pkcs11;
 
 use cli::{Cli, Commands};
 use config::Config;
@@ -56,17 +55,17 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Info => {
-            pkcs11::info::display_info(&module_path)?;
+            rust_hsm_core::info::display_info(&module_path)?;
         }
         Commands::ListSlots { json } => {
-            pkcs11::slots::list_slots(&module_path, json)?;
+            rust_hsm_core::slots::list_slots(&module_path, json)?;
         }
         Commands::ListMechanisms {
             slot,
             detailed,
             json,
         } => {
-            pkcs11::info::list_mechanisms(&module_path, slot, detailed, json)?;
+            rust_hsm_core::info::list_mechanisms(&module_path, slot, detailed, json)?;
         }
         Commands::InitToken {
             label,
@@ -81,7 +80,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 so_pin.ok_or_else(|| anyhow::anyhow!("SO PIN required"))?
             };
-            pkcs11::token::init_token(&module_path, &token_label, &so_pin_value)?;
+            rust_hsm_core::token::init_token(&module_path, &token_label, &so_pin_value)?;
         }
         Commands::InitPin {
             label,
@@ -103,7 +102,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::token::init_pin(&module_path, &token_label, &so_pin_value, &user_pin_value)?;
+            rust_hsm_core::token::init_pin(&module_path, &token_label, &so_pin_value, &user_pin_value)?;
         }
         Commands::DeleteToken {
             label,
@@ -118,7 +117,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 so_pin.ok_or_else(|| anyhow::anyhow!("SO PIN required"))?
             };
-            pkcs11::token::delete_token(&module_path, &token_label, &so_pin_value)?;
+            rust_hsm_core::token::delete_token(&module_path, &token_label, &so_pin_value)?;
         }
         Commands::ListObjects {
             label,
@@ -135,7 +134,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::objects::list_objects(
+            rust_hsm_core::objects::list_objects(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -160,7 +159,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::gen_keypair(
+            rust_hsm_core::keys::gen_keypair(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -186,7 +185,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::sign(
+            rust_hsm_core::keys::sign(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -211,7 +210,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::verify(
+            rust_hsm_core::keys::verify(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -235,7 +234,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::export_pubkey(
+            rust_hsm_core::keys::export_pubkey(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -257,7 +256,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::delete_key(&module_path, &token_label, &user_pin_value, &key_label)?;
+            rust_hsm_core::keys::delete_key(&module_path, &token_label, &user_pin_value, &key_label)?;
         }
         Commands::InspectKey {
             label,
@@ -274,7 +273,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::inspect_key(
+            rust_hsm_core::keys::inspect_key(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -298,7 +297,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::encrypt(
+            rust_hsm_core::keys::encrypt(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -323,7 +322,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::decrypt(
+            rust_hsm_core::keys::decrypt(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -348,7 +347,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::gen_symmetric_key(
+            rust_hsm_core::keys::gen_symmetric_key(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -373,7 +372,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::encrypt_symmetric(
+            rust_hsm_core::keys::encrypt_symmetric(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -398,7 +397,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::decrypt_symmetric(
+            rust_hsm_core::keys::decrypt_symmetric(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -423,7 +422,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::wrap_key(
+            rust_hsm_core::keys::wrap_key(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -449,7 +448,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::unwrap_key(
+            rust_hsm_core::keys::unwrap_key(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -475,7 +474,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::generate_csr(
+            rust_hsm_core::keys::generate_csr(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -489,7 +488,7 @@ fn main() -> anyhow::Result<()> {
             input,
             output,
         } => {
-            pkcs11::keys::hash_data(
+            rust_hsm_core::keys::hash_data(
                 &module_path,
                 &algorithm,
                 &PathBuf::from(&input),
@@ -511,7 +510,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::gen_hmac_key(
+            rust_hsm_core::keys::gen_hmac_key(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -536,7 +535,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::hmac_sign(
+            rust_hsm_core::keys::hmac_sign(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -563,7 +562,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::hmac_verify(
+            rust_hsm_core::keys::hmac_verify(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -588,7 +587,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::gen_cmac_key(
+            rust_hsm_core::keys::gen_cmac_key(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -613,7 +612,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::cmac_sign(
+            rust_hsm_core::keys::cmac_sign(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -639,7 +638,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::keys::cmac_verify(
+            rust_hsm_core::keys::cmac_verify(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -649,7 +648,7 @@ fn main() -> anyhow::Result<()> {
             )?;
         }
         Commands::GenRandom { bytes, output, hex } => {
-            pkcs11::random::generate_random(&module_path, bytes, output.as_ref(), hex)?;
+            rust_hsm_core::random::generate_random(&module_path, bytes, output.as_ref(), hex)?;
         }
         Commands::Benchmark {
             label,
@@ -671,7 +670,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::benchmark::run_full_benchmark(
+            rust_hsm_core::benchmark::run_full_benchmark(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -698,13 +697,13 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::audit::audit_keys(&module_path, &token_label, &user_pin_value, json)?;
+            rust_hsm_core::audit::audit_keys(&module_path, &token_label, &user_pin_value, json)?;
         }
         Commands::ExplainError {
             error_code,
             context,
         } => {
-            pkcs11::troubleshoot::explain_error(&error_code, context.as_deref())?;
+            rust_hsm_core::troubleshoot::explain_error(&error_code, context.as_deref())?;
         }
         Commands::FindKey {
             label,
@@ -721,7 +720,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::troubleshoot::find_key(
+            rust_hsm_core::troubleshoot::find_key(
                 &module_path,
                 &token_label,
                 &user_pin_value,
@@ -744,7 +743,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 user_pin.ok_or_else(|| anyhow::anyhow!("User PIN required"))?
             };
-            pkcs11::troubleshoot::diff_keys(
+            rust_hsm_core::troubleshoot::diff_keys(
                 &module_path,
                 &token_label,
                 &user_pin_value,
