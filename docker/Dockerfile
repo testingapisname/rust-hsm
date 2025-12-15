@@ -1,7 +1,7 @@
 # Multi-stage build: compile Rust with cargo-chef, then create slim runtime with SoftHSM2
 
 FROM rust:1.83-bookworm AS chef
-RUN cargo install cargo-chef
+RUN cargo install cargo-chef --version 0.1.68
 WORKDIR /build
 
 # Analyze dependencies
