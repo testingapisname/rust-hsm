@@ -346,7 +346,7 @@ fn print_grouped_issues(issues: Vec<&SecurityIssue>) {
     for issue in issues {
         by_key
             .entry(issue.key_label.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(issue);
     }
 
