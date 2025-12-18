@@ -25,13 +25,20 @@
 default_token_label = "test-token"
 
 # PKCS#11 module path (defaults to SoftHSM2 location if not specified)
-# Change this if using a different HSM or custom SoftHSM installation
+# Change this to switch between different HSM providers
 #
-# Common values:
-#   - Linux: /usr/lib/softhsm/libsofthsm2.so
-#   - macOS: /usr/local/lib/softhsm/libsofthsm2.so
-#   - Custom HSM: /path/to/your/pkcs11module.so
+# Available options in the Docker container:
+#   - SoftHSM2:  /usr/lib/softhsm/libsofthsm2.so
+#   - Kryoptic:  /usr/lib/kryoptic/libkryoptic_pkcs11.so
+#
+# Other common values:
+#   - macOS SoftHSM2: /usr/local/lib/softhsm/libsofthsm2.so
+#   - Hardware HSM: /path/to/your/pkcs11module.so
 #
 # Note: The PKCS11_MODULE environment variable takes precedence over this setting
 #
-pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"
+# Use SoftHSM2 (default):
+#pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"
+
+# Or use Kryoptic (uncomment to switch):
+pkcs11_module = "/usr/lib/kryoptic/libkryoptic_pkcs11.so"
