@@ -428,7 +428,7 @@ fn sign_tbs(
 /// Convert raw ECDSA signature (r || s) to DER-encoded SEQUENCE { r INTEGER, s INTEGER }
 fn encode_ecdsa_signature(raw_sig: &[u8]) -> anyhow::Result<Vec<u8>> {
     // Split raw signature into r and s components (equal length)
-    if !raw_sig.len().is_multiple_of(2) {
+    if raw_sig.len() % 2 != 0 {
         anyhow::bail!("Invalid ECDSA signature length: {}", raw_sig.len());
     }
 
