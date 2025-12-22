@@ -171,24 +171,45 @@ fn build_tbs_certificate_request(
     };
 
     // Build CertificationRequestInfo: SEQUENCE { version, subject, subjectPKInfo, attributes }
-    let cert_req_info = ASN1Block::Sequence(
-        0,
-        vec![
-            ASN1Block::Integer(0, BigInt::from(0)), // version = 0 (v1)
-            subject_name,                           // subject
-            public_key_algorithm,                   // subjectPKInfo
-            // Empty attributes with context-specific implicit tag [0]
-            ASN1Block::Unknown(
-                ASN1Class::ContextSpecific,
-                true, // constructed
-                0,    // tag 0
-                BigUint::from(0u32),
-                vec![], // empty attributes
-            ),
-        ],
-    );
-
-    let tbs_der = to_der(&cert_req_info)?;
+    // We need to manually construct this because simple_asn1 doesn't properly encode
+    // context-specific implicit tags in to_der()
+    
+    // First encode the three main components
+    let version = ASN1Block::Integer(0, BigInt::from(0));
+    let version_der = to_der(&version)?;
+    let subject_der = to_der(&subject_name)?;
+    let spki_der = to_der(&public_key_algorithm)?;
+    
+    // Manually encode empty attributes with [0] IMPLICIT tag
+    // [0] means context-specific, constructed, tag 0
+    // Empty attributes = tag 0xA0, length 0x00
+    let attributes_der = vec![0xA0, 0x00];
+    
+    // Calculate total length for the SEQUENCE
+    let content_len = version_der.len() + subject_der.len() + spki_der.len() + attributes_der.len();
+    
+    // Build SEQUENCE manually
+    let mut tbs_der = Vec::new();
+    tbs_der.push(0x30); // SEQUENCE tag
+    
+    // Encode length (DER length encoding)
+    if content_len < 128 {
+        tbs_der.push(content_len as u8);
+    } else if content_len < 256 {
+        tbs_der.push(0x81); // long form, 1 byte
+        tbs_der.push(content_len as u8);
+    } else {
+        tbs_der.push(0x82); // long form, 2 bytes
+        tbs_der.push((content_len >> 8) as u8);
+        tbs_der.push((content_len & 0xFF) as u8);
+    }
+    
+    // Append all components
+    tbs_der.extend_from_slice(&version_der);
+    tbs_der.extend_from_slice(&subject_der);
+    tbs_der.extend_from_slice(&spki_der);
+    tbs_der.extend_from_slice(&attributes_der);
+    
     Ok((tbs_der, signature_algorithm_oid))
 }
 
@@ -393,11 +414,42 @@ fn sign_tbs(
                 mechanism_name(&mechanism)
             );
             debug!("→ Calling C_Sign");
-            let signature = session.sign(&mechanism, private_key_handle, &hash)?;
+            let raw_signature = session.sign(&mechanism, private_key_handle, &hash)?;
+            
+            // PKCS#11 returns ECDSA signature as raw r || s concatenation
+            // X.509 CSR requires DER-encoded SEQUENCE { r INTEGER, s INTEGER }
+            let signature = encode_ecdsa_signature(&raw_signature)?;
             Ok(signature)
         }
         _ => anyhow::bail!("Unsupported key type: {:?}", key_type),
     }
+}
+
+/// Convert raw ECDSA signature (r || s) to DER-encoded SEQUENCE { r INTEGER, s INTEGER }
+fn encode_ecdsa_signature(raw_sig: &[u8]) -> anyhow::Result<Vec<u8>> {
+    // Split raw signature into r and s components (equal length)
+    if raw_sig.len() % 2 != 0 {
+        anyhow::bail!("Invalid ECDSA signature length: {}", raw_sig.len());
+    }
+    
+    let component_len = raw_sig.len() / 2;
+    let r_bytes = &raw_sig[..component_len];
+    let s_bytes = &raw_sig[component_len..];
+    
+    // Convert to BigInt (note: PKCS#11 uses big-endian)
+    let r = BigInt::from_bytes_be(num_bigint::Sign::Plus, r_bytes);
+    let s = BigInt::from_bytes_be(num_bigint::Sign::Plus, s_bytes);
+    
+    // Build DER SEQUENCE { r INTEGER, s INTEGER }
+    let sig_seq = ASN1Block::Sequence(
+        0,
+        vec![
+            ASN1Block::Integer(0, r),
+            ASN1Block::Integer(0, s),
+        ],
+    );
+    
+    Ok(to_der(&sig_seq)?)
 }
 
 /// Build the complete CertificationRequest structure

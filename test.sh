@@ -224,10 +224,19 @@ echo -e "\n${GREEN}[25/25] Testing CSR generation${NC}"
 # Generate CSR from existing RSA keypair
 $CLI gen-csr --label "$TEST_TOKEN" --user-pin "$USER_PIN" --key-label "$TEST_KEY" --subject "CN=test.example.com,O=TestOrg,C=US" --output /app/test.csr && echo "✓ CSR generated" || exit 1
 # Verify CSR file exists and is valid
-if [ -f /app/test.csr ] && openssl req -in /app/test.csr -noout -text > /dev/null 2>&1; then
-    echo "✓ CSR file valid ($(wc -c < /app/test.csr) bytes)"
+if [ -f /app/test.csr ]; then
+    echo "✓ CSR file exists ($(wc -c < /app/test.csr) bytes)"
+    # Try to parse with OpenSSL (disable config file requirement)
+    if OPENSSL_CONF=/dev/null openssl req -in /app/test.csr -noout -text > /dev/null 2>&1; then
+        echo "✓ CSR file valid"
+    else
+        echo -e "${RED}✗ CSR file failed OpenSSL validation${NC}"
+        echo "OpenSSL error output:"
+        OPENSSL_CONF=/dev/null openssl req -in /app/test.csr -noout -text 2>&1 | head -10
+        exit 1
+    fi
 else
-    echo -e "${RED}✗ CSR file invalid or not created${NC}"
+    echo -e "${RED}✗ CSR file not created${NC}"
     exit 1
 fi
 
