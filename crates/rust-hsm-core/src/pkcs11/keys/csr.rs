@@ -426,6 +426,7 @@ fn sign_tbs(
 }
 
 /// Convert raw ECDSA signature (r || s) to DER-encoded SEQUENCE { r INTEGER, s INTEGER }
+#[allow(clippy::manual_is_multiple_of)] // is_multiple_of() not stable in Rust 1.83 (Docker)
 fn encode_ecdsa_signature(raw_sig: &[u8]) -> anyhow::Result<Vec<u8>> {
     // Split raw signature into r and s components (equal length)
     if raw_sig.len() % 2 != 0 {
