@@ -234,7 +234,6 @@ pub fn hmac_verify(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_hmac_algorithms() {

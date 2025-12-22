@@ -73,7 +73,6 @@ pub fn hash_data(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_sha256_hash() {

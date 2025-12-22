@@ -1,8 +1,11 @@
 # Multi-stage build: compile Rust, then create slim runtime with SoftHSM2
 
-FROM rust:1.83-bookworm AS builder
+FROM rust:bookworm AS builder
 
 WORKDIR /build
+
+# Install clippy for linting
+RUN rustup component add clippy
 
 # Copy workspace configuration
 COPY Cargo.toml ./
@@ -30,46 +33,36 @@ RUN find crates/rust-hsm-core/src -name "*.rs" -exec touch {} + && \
     find crates/rust-hsm-cli/src -name "*.rs" -exec touch {} +
 RUN cargo build --release --bin rust-hsm-cli
 
+# Run clippy lints
+RUN cargo clippy --all-features --workspace -- -D warnings
+
 # Run tests
 RUN cd crates/rust-hsm-cli && cargo test --release
 
-# Kryoptic build stage (requires nightly for edition 2024 and OpenSSL >= 3.2)
-# Using Ubuntu 24.04 which has OpenSSL 3.0.13, so we install from PPA or build static
-FROM rust:1.83-bookworm AS kryoptic-builder
+# Kryoptic build stage (DISABLED - uncomment to enable Kryoptic support)
+# This stage takes ~2-5 minutes due to OpenSSL compilation
+# To enable: uncomment this section and the COPY commands below
+#
+# FROM rust:1.83-bookworm AS kryoptic-builder
+# WORKDIR /kryoptic-build
+# RUN apt-get update && \
+#     apt-get install -y --no-install-recommends \
+#         git pkg-config libsqlite3-dev libclang-dev clang wget build-essential && \
+#     rm -rf /var/lib/apt/lists/*
+# RUN rustup install nightly && rustup default nightly
+# RUN wget https://www.openssl.org/source/openssl-3.3.2.tar.gz && \
+#     tar -xzf openssl-3.3.2.tar.gz && \
+#     cd openssl-3.3.2 && \
+#     ./config --prefix=/usr/local/openssl-3.3 --openssldir=/usr/local/openssl-3.3 && \
+#     make -j$(nproc) && \
+#     make install && \
+#     cd .. && rm -rf openssl-3.3.2 openssl-3.3.2.tar.gz
+# ENV PKG_CONFIG_PATH=/usr/local/openssl-3.3/lib64/pkgconfig
+# ENV LD_LIBRARY_PATH=/usr/local/openssl-3.3/lib64
+# RUN git clone https://github.com/latchset/kryoptic.git . && \
+#     CONFDIR=/etc cargo +nightly build --release --features standard
 
-WORKDIR /kryoptic-build
-
-# Install build dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        git \
-        pkg-config \
-        libsqlite3-dev \
-        libclang-dev \
-        clang \
-        wget \
-        build-essential && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install Rust nightly
-RUN rustup install nightly && rustup default nightly
-
-# Build OpenSSL 3.3 from source for Kryoptic
-RUN wget https://www.openssl.org/source/openssl-3.3.2.tar.gz && \
-    tar -xzf openssl-3.3.2.tar.gz && \
-    cd openssl-3.3.2 && \
-    ./config --prefix=/usr/local/openssl-3.3 --openssldir=/usr/local/openssl-3.3 && \
-    make -j$(nproc) && \
-    make install && \
-    cd .. && rm -rf openssl-3.3.2 openssl-3.3.2.tar.gz
-
-# Clone and build Kryoptic with custom OpenSSL
-ENV PKG_CONFIG_PATH=/usr/local/openssl-3.3/lib64/pkgconfig
-ENV LD_LIBRARY_PATH=/usr/local/openssl-3.3/lib64
-RUN git clone https://github.com/latchset/kryoptic.git . && \
-    CONFDIR=/etc cargo +nightly build --release --features standard
-
-# Runtime stage: Debian with SoftHSM2 and Kryoptic
+# Runtime stage: Debian with SoftHSM2 (and optionally Kryoptic)
 FROM debian:bookworm-slim
 
 # Install SoftHSM2, Kryoptic runtime dependencies, and utilities
@@ -86,14 +79,10 @@ RUN apt-get update && \
 # Copy Rust binary from builder (built from workspace root)
 COPY --from=builder /build/target/release/rust-hsm-cli /usr/local/bin/rust-hsm-cli
 
-# Copy OpenSSL 3.3 libraries from kryoptic-builder (required by Kryoptic)
-COPY --from=kryoptic-builder /usr/local/openssl-3.3/lib64/*.so* /usr/local/openssl-3.3/lib64/
-
-# Copy Kryoptic PKCS#11 library from kryoptic-builder
-COPY --from=kryoptic-builder /kryoptic-build/target/release/libkryoptic_pkcs11.so /usr/lib/kryoptic/libkryoptic_pkcs11.so
-
-# Set library path to include OpenSSL 3.3 for Kryoptic
-ENV LD_LIBRARY_PATH=/usr/local/openssl-3.3/lib64:$LD_LIBRARY_PATH
+# Kryoptic libraries (DISABLED - uncomment if Kryoptic build stage is enabled)
+# COPY --from=kryoptic-builder /usr/local/openssl-3.3/lib64/*.so* /usr/local/openssl-3.3/lib64/
+# COPY --from=kryoptic-builder /kryoptic-build/target/release/libkryoptic_pkcs11.so /usr/lib/kryoptic/libkryoptic_pkcs11.so
+# ENV LD_LIBRARY_PATH=/usr/local/openssl-3.3/lib64:$LD_LIBRARY_PATH
 
 # Copy SoftHSM configuration and entrypoint
 COPY docker/softhsm2.conf /etc/softhsm2.conf
@@ -107,8 +96,8 @@ RUN chmod +x /entrypoint.sh /app/test.sh /app/cleanup-test-tokens.sh
 ENV SOFTHSM2_CONF=/etc/softhsm2.conf
 ENV PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so
 
-# Create token storage directories for both HSMs
-RUN mkdir -p /tokens /kryoptic-tokens && chmod 755 /tokens /kryoptic-tokens
+# Create token storage directory
+RUN mkdir -p /tokens && chmod 755 /tokens
 
 WORKDIR /app
 
