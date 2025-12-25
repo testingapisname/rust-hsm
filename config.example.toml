@@ -22,6 +22,28 @@
 # With this set, --label becomes optional:
 #   rust-hsm-cli gen-keypair --user-pin 123456 ...
 #
+default_token_label = "DEV_TOKEN"
+
+# Path to the PKCS#11 module to use.
+# This allows switching between different HSM providers.
+#
+# Options:
+#   - SoftHSM2 (default): /usr/lib/softhsm/libsofthsm2.so
+#   - Kryoptic: /usr/lib/kryoptic/libkryoptic_pkcs11.so
+#
+# Can be overridden by PKCS11_MODULE environment variable.
+#
+pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"
+
+# PKCS#11 Observability Settings
+# Enable structured logging of all PKCS#11 operations for debugging and monitoring.
+#
+# observe_enabled = true
+# observe_log_file = "/app/observe.jsonl"
+#
+# With this set, --label becomes optional:
+#   rust-hsm-cli gen-keypair --user-pin 123456 ...
+#
 default_token_label = "test-token"
 
 # PKCS#11 module path (defaults to SoftHSM2 location if not specified)

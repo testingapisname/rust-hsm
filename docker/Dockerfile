@@ -10,9 +10,11 @@ RUN rustup component add clippy
 # Copy workspace configuration
 COPY Cargo.toml ./
 
-# Copy Cargo files for both crates (for layer caching)
+# Copy Cargo files for all crates (for layer caching)
 COPY crates/rust-hsm-core/Cargo.toml crates/rust-hsm-core/Cargo.toml
 COPY crates/rust-hsm-cli/Cargo.toml crates/rust-hsm-cli/Cargo.toml
+COPY crates/observe-core/Cargo.toml crates/observe-core/Cargo.toml
+COPY crates/observe-cryptoki/Cargo.toml crates/observe-cryptoki/Cargo.toml
 
 # Create dummy files with proper module structure to build dependencies
 RUN mkdir -p crates/rust-hsm-core/src/keys && \
@@ -22,16 +24,31 @@ RUN mkdir -p crates/rust-hsm-core/src/keys && \
     for f in asymmetric csr export hash hmac keypair symmetric utils wrap; do echo "pub fn dummy() {}" > crates/rust-hsm-core/src/keys/$f.rs; done && \
     mkdir -p crates/rust-hsm-cli/src && \
     echo "fn main() {}" > crates/rust-hsm-cli/src/main.rs && \
+    mkdir -p crates/observe-core/src && \
+    echo "pub mod event; pub mod redaction; pub mod sink;" > crates/observe-core/src/lib.rs && \
+    for f in event redaction sink; do echo "pub fn dummy() {}" > crates/observe-core/src/$f.rs; done && \
+    mkdir -p crates/observe-cryptoki/src && \
+    echo "pub mod config; pub mod pkcs11; pub mod session;" > crates/observe-cryptoki/src/lib.rs && \
+    for f in config pkcs11 session; do echo "pub fn dummy() {}" > crates/observe-cryptoki/src/$f.rs; done && \
     cargo build --release && \
-    rm -rf target/release/deps/rust_hsm_cli* target/release/deps/rust_hsm_core*
+    rm -rf target/release/deps/rust_hsm_cli* target/release/deps/rust_hsm_core* target/release/deps/observe_core* target/release/deps/observe_cryptoki*
 
 # Copy real source and build actual binaries
 COPY crates/rust-hsm-core/src crates/rust-hsm-core/src
 COPY crates/rust-hsm-cli/src crates/rust-hsm-cli/src
+COPY crates/rust-hsm-cli/examples crates/rust-hsm-cli/examples
+COPY crates/observe-core/src crates/observe-core/src
+COPY crates/observe-cryptoki/src crates/observe-cryptoki/src
 # Force rebuild by touching source files
 RUN find crates/rust-hsm-core/src -name "*.rs" -exec touch {} + && \
-    find crates/rust-hsm-cli/src -name "*.rs" -exec touch {} +
-RUN cargo build --release --bin rust-hsm-cli
+    find crates/rust-hsm-cli/src -name "*.rs" -exec touch {} + && \
+    find crates/observe-core/src -name "*.rs" -exec touch {} + && \
+    find crates/observe-cryptoki/src -name "*.rs" -exec touch {} +
+# Test observe-core first, then build CLI and examples
+RUN cargo test --release -p observe-core && \
+    cargo build --release --bin rust-hsm-cli && \
+    cargo build --release -p rust-hsm-cli --example test_observe && \
+    cargo build --release -p rust-hsm-cli --example test_wrapper
 
 # Run clippy lints
 RUN cargo clippy --all-features --workspace -- -D warnings
@@ -78,6 +95,8 @@ RUN apt-get update && \
 
 # Copy Rust binary from builder (built from workspace root)
 COPY --from=builder /build/target/release/rust-hsm-cli /usr/local/bin/rust-hsm-cli
+COPY --from=builder /build/target/release/examples/test_observe /usr/local/bin/test-observe
+COPY --from=builder /build/target/release/examples/test_wrapper /usr/local/bin/test-wrapper
 
 # Kryoptic libraries (DISABLED - uncomment if Kryoptic build stage is enabled)
 # COPY --from=kryoptic-builder /usr/local/openssl-3.3/lib64/*.so* /usr/local/openssl-3.3/lib64/

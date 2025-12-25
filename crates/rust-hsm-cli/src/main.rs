@@ -201,6 +201,8 @@ fn main() -> anyhow::Result<()> {
                 &input,
                 &output,
                 json,
+                config.observe_enabled,
+                &config.observe_log_file,
             )?;
         }
         Commands::Verify {

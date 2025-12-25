@@ -1,109 +1,299 @@
-# Copilot Instructions for rust-hsm
+# Copilot Instructions for rust-hsm (PKCS#11 CLI + Observability)
 
-## Project Overview
+## Purpose
+You are working in **rust-hsm**, a Rust PKCS#11 CLI that supports both **SoftHSM2** and **Kryoptic** for learning, repeatable workflows, and troubleshooting. The project is **NOT for production security**.
 
-A Rust PKCS#11 CLI tool for interfacing with **SoftHSM2** in a single Docker container. Provides repeatable HSM-style workflows for token management, asymmetric/symmetric key operations, signing, encryption, key wrapping, CSR generation, key fingerprints, and detailed inspection. Includes HMAC, CMAC, hashing, random generation, benchmarking, and security auditing. This is a learning tool - not for production security.
+**New direction (Dec 2025+)**: add **PKCS#11 observability** in a safe way:
+- **Option C (in-process Rust wrapper)**: tracing around `cryptoki` usage inside the CLI.
+- **Option A (drop-in proxy PKCS#11 module)**: a `cdylib` `.so` that forwards to a real vendor module and emits structured logs.
+Both should share a single redaction-first logging core.
 
-## Architecture & Key Insight
+---
 
-**Single-container design**: Both SoftHSM2 and Rust CLI run in the same container. The CLI loads `libsofthsm2.so` directly via the `cryptoki` crate (NOT calling external `pkcs11-tool` commands).
+## Non-Negotiables (Security + Safety)
+- **Never log PINs.**
+- **Never log raw buffers** passed into crypto operations (data-to-sign, plaintext, ciphertext, derived secrets).
+- **Never log sensitive attributes** (e.g., `CKA_VALUE`, private key components, secrets).
+- **Default behavior must be safe** and suitable for open-source.
+- Any "unsafe / verbose" mode must be explicitly opt-in and clearly documented.
 
-```
-┌───────────────────────────────┐
-│     rust-hsm-app container    │
-│  ┌─────────────────────────┐  │
-│  │  rust-hsm-cli binary    │  │
-│  │  (loads libsofthsm2.so) │  │
-│  └──────────┬──────────────┘  │
-│             │ cryptoki FFI    │
-│  ┌──────────▼──────────────┐  │
-│  │  SoftHSM2 (PKCS#11)     │  │
-│  │  /usr/lib/softhsm/      │  │
-│  └──────────┬──────────────┘  │
-│             │                 │
-│  ┌──────────▼──────────────┐  │
-│  │  Token Storage          │  │
-│  │  /tokens (volume)       │  │
-│  └─────────────────────────┘  │
-└───────────────────────────────┘
-```
+Redaction rule of thumb:
+- OK to log: attribute **names**, small enums (class/key type/mechanism), booleans, sizes/lengths, and hashed identifiers.
+- NOT OK: raw attribute values, raw byte buffers, private key material, symmetric key material.
 
-**Token persistence**: Docker volume at `/tokens` survives container restarts. Wipe with `docker volume rm rust-hsm_tokens`.
+If unsure, **redact**.
+
+## Current Architecture (Existing)
+**Single-container design**: Both HSM providers and Rust CLI run in one container. The CLI loads the PKCS#11 module directly via `cryptoki` (no external pkcs11-tool calls).
+
+**Supported HSM Providers**:
+- **SoftHSM2** (default): `/usr/lib/softhsm/libsofthsm2.so` - token storage at `/tokens`
+- **Kryoptic**: `/usr/lib/kryoptic/libkryoptic_pkcs11.so` - SQLite storage at `/kryoptic-tokens`
+
+**Switching providers**: Use config file (`pkcs11_module` setting) or `PKCS11_MODULE` env var. See [SWITCHING_HSM_PROVIDERS.md](../docs/SWITCHING_HSM_PROVIDERS.md).
+
+---
 
 ## Tech Stack
+- **PKCS#11 bindings**: `cryptoki` v0.10
+- **CLI**: `clap` v4.5 derive macros + subcommands
+- **Logging**: `tracing` + `tracing-subscriber` (env-filter)
+- **Container**: Multi-stage Dockerfile (Rust builder → Debian slim runtime)
 
-- **PKCS#11 bindings**: `cryptoki` v0.10 (type-safe Rust wrapper, not raw FFI)
-- **CLI**: `clap` v4.5 with derive macros and subcommands
-- **Logging**: `tracing` + `tracing-subscriber` with env-filter (use `RUST_LOG=debug`)
-- **Crypto libraries**: `sha2`, `simple_asn1`, `num-bigint` for data format conversions
-- **Container**: Multi-stage Dockerfile (Rust 1.83 builder → Debian Bookworm Slim runtime)
+---
 
-## Critical Code Structure
-
+## Codebase Structure (Existing)
 ```
 crates/rust-hsm-cli/src/
-  main.rs                   # CLI entry, subcommand dispatch, PIN input handling (328 lines)
-  cli.rs                    # Command definitions with clap derive macros (531 lines)
-  config.rs                 # Configuration file loading (.rust-hsm.toml)
+  main.rs
+  cli.rs
+  config.rs
   pkcs11/
-    mod.rs                  # Module exports (thin layer)
-    errors.rs               # Custom Pkcs11Error type wrapping cryptoki::error::Error
-    info.rs                 # Module/slot/mechanism information with --detailed flags (179 lines)
-    slots.rs                # Slot enumeration
-    token.rs                # Token init, PIN setup
-    objects.rs              # Object listing with --detailed flag (p11ls-style) (245 lines)
-    audit.rs                # Security audit with severity levels and issue detection
+    mod.rs
+    errors.rs
+    info.rs
+    slots.rs
+    token.rs
+    objects.rs
+    audit.rs
+    troubleshoot.rs
     keys/
-      mod.rs                # Re-exports all key operations
-      utils.rs              # Shared helpers: find_token_slot, mechanism_name, get_key_type
-      keypair.rs            # RSA/ECDSA key generation
-      asymmetric.rs         # Sign/verify/encrypt/decrypt (RSA & ECDSA)
-      symmetric.rs          # AES key gen, AES-GCM encrypt/decrypt
-      export.rs             # PEM export for public keys
-      wrap.rs               # AES Key Wrap (RFC 3394)
-      csr.rs                # X.509 CSR generation
-      inspect.rs            # Key attribute inspection with SHA-256 fingerprints (401 lines)
-      hash.rs               # SHA-256/384/512/224/1 hashing (no login required)
-      hmac.rs               # HMAC-SHA1/224/256/384/512 operations
-      benchmark.rs          # Performance benchmarking suite
+      mod.rs
+      utils.rs
+      keypair.rs
+      asymmetric.rs
+      symmetric.rs
+      export.rs
+      wrap.rs
+      csr.rs
+      inspect.rs
+      hash.rs
+      hmac.rs
+      benchmark.rs
 ```
+
+---
+
+## Observability: Implementation Strategy (NEW)
+
+### Goal
+Provide **structured, correlation-friendly traces** of PKCS#11 behavior to answer:
+- What PKCS#11 call happened?
+- What mechanism / object class / key type was involved?
+- What failed (return code + context) and how long did it take?
+- What state transitions occurred (init/login/find/sign/close)?
+
+### Deliverables
+We want both:
+1. **Option C**: tracing wrappers in Rust around `cryptoki` (used by CLI and tests).
+2. **Option A**: a **proxy PKCS#11 module** (`cdylib`) that forwards calls to a real module and logs events.
+
+### Project Layout (Recommended)
+Prefer a workspace layout so code is shared and not duplicated:
+```
+crates/
+  observe-core/        # shared schema + redaction + sinks + hints (NO PKCS#11 FFI)
+  observe-cryptoki/    # Option C: wrapper helpers around cryptoki (used by rust-hsm-cli)
+  observe-proxy/       # Option A: cdylib PKCS#11 proxy module (C ABI via Rust FFI)
+  rust-hsm-cli/        # existing CLI depends on observe-cryptoki/observe-core
+```
+
+If the repo is not yet a workspace, keep changes minimal and introduce crates gradually.
+
+---
+
+## observe-core Requirements (Shared Logging Core)
+Implement a small, stable core API used by both Option A and Option C.
+
+### Event Schema (JSONL-friendly)
+Events must be serializable to JSON lines with stable keys:
+- `ts` (RFC3339 or unix ms)
+- `pid`, `tid`
+- `module` (target module path or name; proxy should record both proxy+target)
+- `func` (PKCS#11 function name, e.g., `C_SignInit`)
+- `rv` numeric + `rv_name` string
+- `dur_ms`
+- `slot_id` (if known)
+- `session` handle (if known)
+- `mech` (if known)
+- `template_summary` (if present)
+- `op_id` correlation ID (optional but recommended)
+- `hint` short human-friendly diagnosis (optional)
+
+### Template Summary Rules
+Summarize templates by listing attribute names and safe values:
+- OK: `CKA_CLASS`, `CKA_KEY_TYPE`, booleans like `CKA_SIGN`, `CKA_DECRYPT`, lengths like `CKA_MODULUS_BITS`
+- For `CKA_LABEL` / `CKA_ID`: log `len` + `sha256` (or `blake3`) hash, not plaintext.
+- Never include raw bytes.
+
+### Error Hints
+Add small, context-aware hints:
+- `CKR_MECHANISM_INVALID` / `CKR_MECHANISM_PARAM_INVALID`
+- `CKR_KEY_TYPE_INCONSISTENT`
+- `CKR_USER_NOT_LOGGED_IN`
+- `CKR_ATTRIBUTE_SENSITIVE` / `CKR_ATTRIBUTE_TYPE_INVALID`
+Keep hints concise and non-speculative.
+
+### Sinks
+- JSON Lines file sink
+- stderr sink
+(OTel/OTLP can be future work.)
+
+---
+
+## Option C (observe-cryptoki): How to Integrate
+- Wrap common actions (init, open session, login, find objects, sign, encrypt/decrypt).
+- Emit an event per "call boundary" with duration and rv.
+- Correlate init/update/final sequences using an `op_id` attached to:
+  - `FindObjectsInit/FindObjects/FindObjectsFinal`
+  - `SignInit/Sign/SignFinal`
+  - `EncryptInit/Encrypt/EncryptFinal`
+  - `DecryptInit/Decrypt/DecryptFinal`
+
+Keep wrappers ergonomic; avoid forcing major refactors in CLI.
+
+---
+
+## Option A (observe-proxy): Proxy Module Rules
+- Build a `cdylib` that exports PKCS#11 entrypoints (at minimum `C_GetFunctionList`).
+- It should `dlopen()` the target PKCS#11 module specified by env var:
+  - `PKCS11_OBSERVE_TARGET=/path/to/vendor.so`
+- Obtain the real `CK_FUNCTION_LIST`, then return a wrapped list where wrappers:
+  - Start timer
+  - Summarize safe parameters (mechanism enums, template attribute names, lengths)
+  - Call the real function
+  - Log rv + duration + context
+
+### Context Tracking (Minimal)
+Maintain small maps:
+- `session_handle -> slot_id`
+- `session_handle -> active op_id` (per operation family)
+Keep it thread-safe (Mutex/RwLock) but simple.
+
+### Proxy Must Not Change Behavior
+- Forward return values exactly.
+- Do not alter buffers.
+- Do not "fix" errors.
+- Do not reorder calls.
+- Avoid panics; if internal logging fails, continue forwarding.
+
+---
+
+## PKCS#11 Patterns (Critical)
+Always follow proper lifecycle:
+- `C_Initialize` → operations → `C_Finalize`
+- open session → optional login → operations → logout → close session
+Skipping finalize can cause resource leaks.
+
+**Logging convention (existing)**:
+- `debug!("→ Calling C_X")` before calling underlying PKCS#11 operation.
+Keep this pattern; observability layers should complement, not replace.
+
+---
+
+## CLI Conventions
+- Use `clap` derive macros; keep subcommands in `cli.rs`, dispatch in `main.rs`.
+- Keep operations in `pkcs11/*` modules.
+- Add tests to `test.sh` when introducing core ops.
+
+---
 
 ## Development Workflow
 
-### Configuration File (New!)
-Create `/ app/.rust-hsm.toml` or `.rust-hsm.toml` to avoid repeating `--label`:
+### Configuration File
+Create `/app/.rust-hsm.toml` or `.rust-hsm.toml` to avoid repeating `--label`:
 ```toml
 default_token_label = "DEV_TOKEN"
-pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"
+pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"  # or libkryoptic_pkcs11.so
 ```
 - CLI args override config values
 - Config module: [src/config.rs](../crates/rust-hsm-cli/src/config.rs)
-- Loaded in [main.rs](../crates/rust-hsm-cli/src/main.rs#L336-L341)
-- Example: [config.example.toml](../config.example.toml)
+- Switch HSM providers by changing `pkcs11_module` path
+- Environment variable `PKCS11_MODULE` overrides config file
 
 ### Build & Run
 ```bash
-docker compose up -d --build          # Rebuild after code changes
+docker compose up -d --build
 docker exec rust-hsm-app rust-hsm-cli info
+docker exec rust-hsm-app /app/test.sh          # SoftHSM2 tests
+docker exec rust-hsm-app /app/testKryoptic.sh  # Kryoptic tests
 ```
 
-### Testing
-```bash
-docker exec rust-hsm-app /app/test.sh  # Run full integration test suite (40 tests)
-```
-
-### Reset Token State
+Reset state:
 ```bash
 docker compose down
-docker volume rm rust-hsm_tokens
-docker compose up -d
+docker volume rm rust-hsm_tokens rust-hsm_kryoptic-tokens
+docker compose up -d --build
 ```
 
-## PKCS#11 Patterns (Critical for AI Agents)
+---
 
-### Session Lifecycle (Always Follow)
+## Testing Requirements (Observability)
+Add at least:
+1) HSM provider "smoke" tests (both SoftHSM2 and Kryoptic):
+- init token
+- generate keypair
+- sign
+- verify
+- ensure logs contain expected function names and rv=OK
+2) Redaction test:
+- ensure no PIN appears
+- ensure no raw data buffers appear
+- ensure `CKA_LABEL` is hashed not plaintext
+3) Provider compatibility:
+- Test with both SoftHSM2 and Kryoptic
+- Use [testKryoptic.sh](../testKryoptic.sh) for Kryoptic validation
+- Check for provider-specific behavior differences
 
-Every function follows this pattern (see [symmetric.rs](../crates/rust-hsm-cli/src/pkcs11/keys/symmetric.rs#L23-L70)):
+---
+
+## Performance Requirements
+- Observability must add minimal overhead.
+- Logging should be buffered or async where practical.
+- Avoid expensive formatting on hot paths unless log level requires it.
+
+---
+
+## How to Respond as Copilot (Coding Style Guidance)
+- Prefer small, reviewable commits.
+- Avoid large refactors unless necessary.
+- Make changes compile on stable Rust.
+- Use explicit control flow (avoid ternary-style expressions).
+- Handle errors with context (`anyhow`, custom error types) and avoid panics in proxy path.
+- Add concise docs in `docs/` for new modules, including usage examples.
+
+---
+
+## "Done" Criteria for Observability MVP
+- observe-core exists with JSONL sink + redaction.
+- CLI can emit structured trace logs via observe-cryptoki (Option C).
+- Proxy module builds as `cdylib` and can forward to SoftHSM module (Option A).
+- Tests confirm behavior + redaction.
+- Documentation explains how to run proxy:
+  - setting `PKCS11_OBSERVE_TARGET`
+  - using the proxy as the PKCS#11 module path in apps/tools
+
+
+**Recent upgrade: v0.6 → v0.10 (Dec 2025)**
+- `GcmParams::new()` now returns `Result<GcmParams, Error>` - use `?` operator
+- IV parameter changed from `&[u8]` to `&mut [u8]` - use `let mut iv` and `&mut iv`
+- `Ulong` still uses `u64` (not `u32`) - cast with `as u64`
+- All 24 tests pass after migration
+
+When upgrading to future versions:
+1. Check [cryptoki changelog](https://github.com/parallaxsecond/rust-cryptoki/releases) for breaking changes
+2. Update `mechanism_name()` helper with new mechanisms in [utils.rs](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs)
+3. Test all existing operations with full Docker rebuild: `docker compose build --no-cache`
+4. Run integration tests:
+   - SoftHSM2: `docker exec rust-hsm-app /app/test.sh`
+   - Kryoptic: `docker exec rust-hsm-app /app/testKryoptic.sh`
+5. Update this file with newly supported mechanisms and API changes
+
+---
+
+## PKCS#11 Session Lifecycle (Critical)
+
+Every function follows this pattern (see [symmetric.rs](../crates/rust-hsm-cli/src/pkcs11/keys/symmetric.rs)):
 ```rust
 let pkcs11 = Pkcs11::new(module_path)?;
 debug!("→ Calling C_Initialize");
@@ -124,18 +314,46 @@ debug!("→ Calling C_Finalize");
 pkcs11.finalize();
 ```
 
-**Why this matters**: PKCS#11 is stateful. Skipping finalize causes resource leaks. Logging C_ function names helps debug SoftHSM issues.
+**Why this matters**: PKCS#11 is stateful. Skipping finalize causes resource leaks. Logging C_ function names helps debug HSM issues.
 
-### Logging Convention (MANDATORY)
+---
 
-Use three-level logging with `tracing`:
-- `info!()` - Major milestones: "Signing data with key 'X' on token 'Y'"
-- `debug!()` - PKCS#11 calls: `debug!("→ Calling C_GenerateKey")`
-- `trace!()` - Raw data: `trace!("Hash value: {:02x?}", &hash)`
+## HSM Provider Differences
 
-**Pattern**: Always log the PKCS#11 C_ function name before calling it. Use [mechanism_name()](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs#L10-L21) to log mechanism types (e.g., "CKM_SHA256_RSA_PKCS").
+### SoftHSM2
+- **Mature, widely tested**: Industry standard for PKCS#11 testing
+- **Token storage**: File-based at `/tokens`
+- **Mechanism support**: Comprehensive (RSA, ECDSA, AES-GCM, AES-CMAC, HMAC, etc.)
+- **Best for**: General PKCS#11 operations, production-like testing
 
-### Key Type Differences (Asymmetric Signing)
+### Kryoptic
+- **Rust-native**: Written in Rust, integrates well with Rust tooling
+- **Token storage**: SQLite database at `/kryoptic-tokens`
+- **Configuration**: Requires `KRYOPTIC_CONF` env var pointing to [kryoptic.conf](../kryoptic.conf)
+- **Mechanism support**: Growing (may have differences from SoftHSM2)
+- **Best for**: Rust ecosystem integration, modern cryptography
+- **Note**: Some operations may behave differently - always test both providers
+
+### Switching Providers
+**Method 1 (Config file)**:
+```toml
+pkcs11_module = "/usr/lib/kryoptic/libkryoptic_pkcs11.so"
+```
+
+**Method 2 (Environment variable)**:
+```bash
+export PKCS11_MODULE=/usr/lib/kryoptic/libkryoptic_pkcs11.so
+export KRYOPTIC_CONF=/kryoptic-tokens/kryoptic.conf  # Required for Kryoptic
+rust-hsm-cli info
+```
+
+**Full documentation**: [SWITCHING_HSM_PROVIDERS.md](../docs/SWITCHING_HSM_PROVIDERS.md)
+
+---
+
+## Key Operations Reference
+
+### Asymmetric Key Signing Differences
 
 **RSA**: Mechanism does hashing internally
 ```rust
@@ -151,7 +369,7 @@ let hash = Sha256::digest(&data);
 let signature = session.sign(&mechanism, key_handle, &hash)?; // Pass hash, not raw data
 ```
 
-See [asymmetric.rs](../crates/rust-hsm-cli/src/pkcs11/keys/asymmetric.rs#L57-L70) for the detection logic.
+See [asymmetric.rs](../crates/rust-hsm-cli/src/pkcs11/keys/asymmetric.rs) for the detection logic.
 
 ### AES-GCM Format Convention
 
@@ -163,100 +381,9 @@ Encrypted files have this structure (implemented in [symmetric.rs](../crates/rus
 **IV**: Random 96 bits, generated per encryption, prepended to output.  
 **Auth Tag**: 128 bits, appended by PKCS#11, stored with ciphertext.
 
-### Security Rules
-
-- **Never log PINs**: Use `debug!("User PIN: ***hidden***")` if mentioning PINs
-- **Never hardcode PINs**: Always read from args/stdin (see `--pin-stdin` support in [main.rs](../crates/rust-hsm-cli/src/main.rs#L8-L14))
-- **Mark keys as sensitive**: `Attribute::Sensitive(true)` for private/secret keys
-- **Non-extractable by default**: Symmetric keys use `Attribute::Extractable(false)` unless `--extractable` flag
-
-## Common Tasks for AI Agents
-
-### Adding a New Command
-
-1. Add variant to `Commands` enum in [main.rs](../crates/rust-hsm-cli/src/main.rs#L23)
-2. Implement function in appropriate `pkcs11/keys/*.rs` module
-3. Add export to [pkcs11/keys/mod.rs](../crates/rust-hsm-cli/src/pkcs11/keys/mod.rs)
-4. Add match arm in `main()` to dispatch to your function
-5. Add test case to [test.sh](../test.sh) if it's a core operation
-
-### Important Refactoring: CLI Structure
-
-**Major refactor (Dec 2025)**: Split `main.rs` (863 lines) into focused modules:
-- **cli.rs (531 lines)**: All `Commands` enum definitions with clap derive macros
-- **main.rs (328 lines)**: Command dispatch, PIN handling, error handling
-- **Benefits**: Cleaner separation, easier to add commands, better IDE navigation
-
-When adding new commands:
-1. Define command struct in `cli.rs` with clap attributes
-2. Add variant to `Commands` enum
-3. Handle in `main.rs` match statement
-4. Implement business logic in appropriate `pkcs11/*.rs` module
-
-### Key Fingerprints (NEW!)
-
-**SHA-256 fingerprints** for public key verification (like SSH fingerprints):
-- Displayed automatically in `inspect-key` output
-- Format: colon-separated hex (e.g., `ec:bb:93:16:a4:7c:...`)
-- RSA: Hash of modulus + public exponent
-- ECDSA: Hash of EC params + EC point
-- Included in JSON output for automation
-- Implementation: [inspect.rs calculate_fingerprint()](../crates/rust-hsm-cli/src/pkcs11/keys/inspect.rs)
-
-### Troubleshooting Commands (NEW - Dec 2025!)
-
-**Purpose**: HSM diagnostic and debugging tools for troubleshooting application errors.
-
-**Implementation**: [troubleshoot.rs](../crates/rust-hsm-cli/src/pkcs11/troubleshoot.rs) - 655 lines
-
-1. **explain-error**: PKCS#11 error code decoder
-   - Pattern matching on error code strings (name, hex, decimal)
-   - 35+ error codes with descriptions, causes, and solutions
-   - Context-aware troubleshooting for operations (sign, verify, encrypt, decrypt, login, wrap)
-   - Returns `Result<()>` with formatted output to stdout
-
-2. **find-key**: Fuzzy key search with Levenshtein distance
-   - Searches for exact matches first
-   - If not found and `--show-similar`, calculates edit distance for all keys
-   - Shows keys with distance ≤3 as "similar"
-   - Displays key type, capabilities, and security flags
-   - Requires session login (uses existing session pattern)
-
-3. **diff-keys**: Side-by-side key comparison
-   - Retrieves attributes for both keys in parallel
-   - Compares 17 attributes: Class, KeyType, Token, Private, Modifiable, etc.
-   - Displays comparison table with ✓ (match) or ✗ (difference) indicators
-   - Lists all differences with severity assessment and explanations
-   - No login required for public keys, login required for private keys
-
-**Command Pattern**: These follow the same session management pattern but don't require login for read-only operations like explain-error. See [troubleshoot.rs](../crates/rust-hsm-cli/src/pkcs11/troubleshoot.rs) for reference implementations.
-
-### Detailed Listing Flags (NEW!)
-
-**--detailed flag pattern** for enhanced output:
-
-1. **list-mechanisms --detailed**: Shows capability flags (like p11slotinfo)
-   ```
-   CKM_RSA_PKCS                               enc dec sig vfy wra unw
-   CKM_AES_GCM                                enc dec
-   ```
-   Flags: enc, dec, sig, vfy, hsh, gkp, wra, unw, der, srec, vrec, gen
-
-2. **list-objects --detailed**: Shows p11ls-style attributes
-   ```
-   prvk/rsa   my-key                               tok,prv,r/w,loc,sen,ase,nxt,XTR,sig,dec,unw,rsa(2048)
-   pubk/ec    ec-key                               tok,pub,r/w,loc,vfy,enc,wra
-   ```
-   Attributes: tok, prv/pub, r/w/r/o, loc/imp, sig, vfy, enc, dec, wra, unw, der, sen, ase, nxt, XTR
-
-**Implementation notes**:
-- Use `MechanismInfo` from cryptoki for mechanism capabilities
-- Format helpers in [info.rs format_mechanism_flags()](../crates/rust-hsm-cli/src/pkcs11/info.rs)
-- Object details in [objects.rs get_detailed_object_info()](../crates/rust-hsm-cli/src/pkcs11/objects.rs)
-
 ### Finding Keys by Label
 
-Use the pattern from [utils.rs](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs#L38-L49):
+Use the pattern from [utils.rs](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs):
 ```rust
 let template = vec![
     Attribute::Class(ObjectClass::PrivateKey), // or PublicKey, SecretKey
@@ -266,21 +393,29 @@ let key_handle = session.find_objects(&template)?.first().copied()
     .ok_or_else(|| anyhow::anyhow!("Key '{}' not found", key_label))?;
 ```
 
-### Determining Mechanism Types
+---
 
-Check [utils.rs mechanism_name()](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs#L10-L21) for supported mechanisms. When adding new mechanisms:
-1. Use the `cryptoki::mechanism::Mechanism` enum variant (NOT raw CKM_ constants)
-2. Add logging case to `mechanism_name()` helper
-3. Document which PKCS#11 operation it's used for (sign, encrypt, wrap, etc.)
+## Adding New Commands
 
-**Note**: `cryptoki` v0.6 lacks some mechanisms like AES-CMAC. See [docs/IMPLEMENTING_AES_CMAC.md](../docs/IMPLEMENTING_AES_CMAC.md) for workarounds.
+1. Add variant to `Commands` enum in [cli.rs](../crates/rust-hsm-cli/src/cli.rs)
+2. Implement function in appropriate `pkcs11/*.rs` module
+3. Add export to [pkcs11/keys/mod.rs](../crates/rust-hsm-cli/src/pkcs11/keys/mod.rs) if needed
+4. Add match arm in [main.rs](../crates/rust-hsm-cli/src/main.rs) to dispatch to your function
+5. Add test case to [test.sh](../test.sh) for SoftHSM2
+6. Add test case to [testKryoptic.sh](../testKryoptic.sh) for Kryoptic
+7. Update command documentation in [docs/commands/](../docs/commands/)
 
-## Testing & Debugging
+---
 
-### Run Full Test Suite
-```bash
-docker exec rust-hsm-app /app/test.sh  # 43 tests: RSA, ECDSA, AES, wrap/unwrap, CSR, hash, HMAC, CMAC, fingerprints, troubleshooting
-```
+## Troubleshooting & Debugging
+
+### Available Troubleshooting Commands
+- **explain-error**: Decode PKCS#11 error codes (35+ codes with context)
+- **find-key**: Fuzzy key search with Levenshtein distance
+- **diff-keys**: Side-by-side key comparison (17 attributes)
+- **audit**: Security auditing with severity levels
+
+See [docs/commands/troubleshooting.md](../docs/commands/troubleshooting.md) for details.
 
 ### Debug Mode
 ```bash
@@ -290,179 +425,22 @@ RUST_LOG=debug docker exec rust-hsm-app rust-hsm-cli gen-keypair \
 
 ### Common Issues
 
-**"Token not found"**: Token might be in different slot. Run `list-slots` to see all tokens.  
-**"CKR_PIN_INCORRECT"**: Check PIN with `list-objects` first. SoftHSM locks after 3 failures.  
-**"Key not found"**: Use `list-objects` to see all objects on token - keys might have different label.  
-**Slot allocation**: SoftHSM picks the next available slot. If slot 0 is occupied, it uses slot 1, 2, etc.
+**"Token not found"**: Token might be in different slot. Run `list-slots` to see all tokens.
+**"CKR_PIN_INCORRECT"**: Check PIN with `list-objects` first. SoftHSM locks after 3 failures.
+**"Key not found"**: Use `list-objects` to see all objects on token - keys might have different label.
+**Kryoptic issues**: Ensure `KRYOPTIC_CONF` env var is set to [kryoptic.conf](../kryoptic.conf) path.
+**Provider differences**: Some mechanisms may work differently between SoftHSM2 and Kryoptic - test both.
 
-### Reset Everything
-```bash
-docker compose down
-docker volume rm rust-hsm_tokens
-docker compose up -d --build
-```
+---
 
-## Known Limitations & Future Work
+## Security Rules
 
-### Current Limitations
+- **Never log PINs**: Use `debug!("User PIN: ***hidden***")` if mentioning PINs
+- **Never hardcode PINs**: Always read from args/stdin (see `--pin-stdin` support in [main.rs](../crates/rust-hsm-cli/src/main.rs))
+- **Mark keys as sensitive**: `Attribute::Sensitive(true)` for private/secret keys
+- **Non-extractable by default**: Symmetric keys use `Attribute::Extractable(false)` unless `--extractable` flag
+- **Redaction first**: When in doubt about logging, redact
 
-**1. `cryptoki` v0.10 Mechanism Coverage**
-- **✅ Implemented**: AES-CMAC (`CKM_AES_CMAC`, `CKM_AES_CMAC_GENERAL`) - full support including truncated MACs
-- **✅ Implemented**: HMAC operations (SHA-1/224/256/384/512) - sign and verify
-- **✅ Implemented**: Hashing (SHA-1/224/256/384/512) - no login required
-- **✅ Implemented**: Random number generation (`C_GenerateRandom`) - no login required
-- **Missing**: Raw RSA operations (OAEP padding, PSS signatures)
-- **Missing**: Key derivation functions (PBKDF2, HKDF)
-- **Note**: Upgraded from v0.6 - `GcmParams::new()` now returns `Result` and requires mutable IV reference
+---
 
-**2. Asymmetric Crypto Constraints**
-- **RSA encryption size limit**: 245 bytes for 2048-bit keys, 501 bytes for 4096-bit keys (PKCS#1 v1.5 overhead)
-- **No RSA-OAEP**: Only PKCS#1 v1.5 padding supported (`CKM_RSA_PKCS`)
-- **Limited curves**: Only P-256 and P-384 ECDSA curves (no P-521, Ed25519, X25519)
-- **No ECDH**: Key agreement not implemented
-
-**3. Key Management**
-- **✅ Key inspection**: Detailed CKA_* attribute display with `inspect-key` command
-- **✅ Key fingerprints**: SHA-256 fingerprints for public keys (RSA & ECDSA)
-- **✅ JSON output**: Machine-readable format for automation
-- **✅ Security auditing**: Detect weak keys, improper configurations, security issues
-- **No bulk operations**: Must delete keys one at a time
-- **No key backup/restore**: Except via wrap/unwrap (requires extractable keys)
-
-**4. Token Management**
-- **Single token operations**: Commands operate on one token at a time
-- **No SO PIN management**: Can't change SO PIN after initialization
-- **Manual slot selection**: SoftHSM auto-assigns slots; can't force specific slot numbers
-
-**5. Security Limitations (SoftHSM)**
-- **Software-backed**: No hardware security module protection
-- **Keys on disk**: Token storage at `/tokens` is just encrypted files
-- **Not for production**: Educational/testing tool only
-
-### Planned Future Work
-
-**High Priority**
-1. **✅ COMPLETED: MAC Operations**
-   - HMAC (SHA-1/224/256/384/512): `hmac-sign`, `hmac-verify`
-   - AES-CMAC: `cmac-sign`, `cmac-verify` with optional truncation
-   - See [IMPLEMENTING_AES_CMAC.md](../docs/IMPLEMENTING_AES_CMAC.md) for implementation details
-
-2. **✅ COMPLETED: Key Attribute Inspection**
-   - `inspect-key` command with detailed CKA_* attributes
-   - SHA-256 fingerprints for public keys
-   - JSON output support with `--json` flag
-   - Distinguishes between RSA and ECDSA keys automatically
-
-3. **✅ COMPLETED: Detailed Object/Mechanism Listing**
-   - `list-objects --detailed` shows p11ls-style output (type, flags, capabilities, sizes)
-   - `list-mechanisms --detailed` shows p11slotinfo-style capabilities (enc/dec/sig/vfy/etc)
-   - Supports `--slot` parameter for specific slot queries
-
-4. **✅ COMPLETED: Security Auditing**
-   - `audit` command detects weak keys, configuration issues, security problems
-   - Severity levels: CRITICAL, HIGH, MEDIUM, LOW
-   - Grouped by category for easy remediation
-
-5. **Find Orphaned Keys**
-   ```bash
-   rust-hsm-cli delete-all-keys --label TOKEN --user-pin PIN --pattern "temp-*"
-   rust-hsm-cli list-keys --label TOKEN --user-pin PIN --format json
-   ```
-
-   - Detect private keys without public keys (and vice versa)
-   - Commands: `find-orphaned-keys`
-   - Useful for cleanup and troubleshooting
-
-6. **Compare Keys**
-   - Side-by-side comparison of key attributes
-   - Useful for troubleshooting key mismatches
-   - Commands: `compare-keys --key-label KEY1 --key-label KEY2`
-
-7. **RSA-OAEP Support**
-   - Larger payload encryption (up to key_size - 66 bytes for SHA-256)
-   - Stronger security than PKCS#1 v1.5
-   - Requires `cryptoki` enum extension or raw mechanism
-
-8. **Additional Curves**
-   - P-521 for ECDSA
-   - Curve25519 (Ed25519 signatures, X25519 ECDH)
-   - Check `cryptoki` version support
-
-**Medium Priority**
-9. **Key Derivation Functions**
-   - PBKDF2 for password-based key derivation
-   - HKDF for key stretching
-   - Useful for deriving encryption keys from passwords
-
-10. **Batch Operations**
-   ```bash
-   rust-hsm-cli delete-all-keys --label TOKEN --user-pin PIN --pattern "temp-*"
-   rust-hsm-cli list-keys --label TOKEN --user-pin PIN --format json
-   ```
-
-11. **Session Management**
-   - Persistent sessions (avoid login for multiple operations)
-   - Read-only session optimization (currently opens RW for everything)
-
-12. **PIN Management**
-   - Change user PIN command
-   - Change SO PIN command
-   - PIN complexity validation
-
-13. **Certificate Management**
-   - Import X.509 certificates to token
-   - Link certificates to keypairs
-   - Certificate chain validation
-
-**Low Priority**
-14. **Multi-token Operations**
-    - Copy keys between tokens
-    - Compare token contents
-    - Synchronize key sets
-
-15. **✅ COMPLETED: Performance Benchmarking**
-    - `benchmark` command with full suite or specific key testing
-    - Measures ops/sec and latency (P50/P95/P99)
-    - Tests: RSA/ECDSA signing, encryption, hashing, MACs, random generation
-    - Auto-detects key types and capabilities
-
-16. **✅ COMPLETED: Troubleshooting Commands (Dec 2025)**
-    - `explain-error` - Decode 35+ PKCS#11 error codes with context-aware troubleshooting
-      - Supports name, hex, and decimal formats (CKR_PIN_INCORRECT, 0x000000A0, 160)
-      - Context flags: sign, verify, encrypt, decrypt, login, wrap
-      - Implementation: [troubleshoot.rs](../crates/rust-hsm-cli/src/pkcs11/troubleshoot.rs)
-    - `find-key` - Fuzzy key search with Levenshtein distance matching
-      - Shows exact matches and similar keys (edit distance ≤3)
-      - Displays key type, capabilities, and security flags
-      - Helps locate keys with typos or naming variations
-    - `diff-keys` - Side-by-side key comparison
-      - Compares 17 key attributes (class, type, capabilities, security flags)
-      - Shows differences with severity indicators (CRITICAL/HIGH/MEDIUM/LOW)
-      - Useful for troubleshooting "identical" keys with different behavior
-    - Documentation: [docs/commands/troubleshooting.md](../docs/commands/troubleshooting.md)
-    - Tests: 43 total (40 existing + 3 new troubleshooting tests)
-
-### Contributing Notes
-
-When implementing new features:
-- **Start with mechanism support**: Check if `cryptoki` supports the mechanism first
-- **Update `mechanism_name()`**: Add new mechanisms to [utils.rs](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs#L10-L21)
-- **Follow logging pattern**: Always log C_ function names before PKCS#11 calls
-- **Add to test suite**: Update [test.sh](../test.sh) with test cases
-- **Document in README**: Add usage examples to main README
-- **Reference standards**: Link to RFCs/NIST specs in code comments
-
-### Cryptoki Version Migration
-
-**Recent upgrade: v0.6 → v0.10 (Dec 2025)**
-- `GcmParams::new()` now returns `Result<GcmParams, Error>` - use `?` operator
-- IV parameter changed from `&[u8]` to `&mut [u8]` - use `let mut iv` and `&mut iv`
-- `Ulong` still uses `u64` (not `u32`) - cast with `as u64`
-- All 24 tests pass after migration
-
-When upgrading to future versions:
-1. Check [cryptoki changelog](https://github.com/parallaxsecond/rust-cryptoki/releases) for breaking changes
-2. Update `mechanism_name()` helper with new mechanisms in [utils.rs](../crates/rust-hsm-cli/src/pkcs11/keys/utils.rs)
-3. Test all existing operations with full Docker rebuild: `docker compose build --no-cache`
-4. Run integration tests: `docker exec rust-hsm-app /app/test.sh`
-5. Update this file with newly supported mechanisms and API changes
+## Cryptoki Version Upgrade Notes

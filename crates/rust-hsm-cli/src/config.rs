@@ -13,10 +13,22 @@ pub struct Config {
     /// Default PKCS#11 module path (defaults to SoftHSM2 location)
     #[serde(default = "default_pkcs11_module")]
     pub pkcs11_module: String,
+
+    /// Enable PKCS#11 observability logging
+    #[serde(default)]
+    pub observe_enabled: bool,
+
+    /// Path to observability log file (JSON Lines format)
+    #[serde(default = "default_observe_log_file")]
+    pub observe_log_file: String,
 }
 
 fn default_pkcs11_module() -> String {
     "/usr/lib/softhsm/libsofthsm2.so".to_string()
+}
+
+fn default_observe_log_file() -> String {
+    "/app/rust-hsm-observe.json".to_string()
 }
 
 impl Default for Config {
@@ -24,6 +36,8 @@ impl Default for Config {
         Self {
             default_token_label: None,
             pkcs11_module: default_pkcs11_module(),
+            observe_enabled: false,
+            observe_log_file: default_observe_log_file(),
         }
     }
 }

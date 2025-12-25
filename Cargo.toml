@@ -2,5 +2,7 @@
 members = [
     "crates/rust-hsm-core",
     "crates/rust-hsm-cli",
+    "crates/observe-core",
+    "crates/observe-cryptoki",
 ]
 resolver = "2"

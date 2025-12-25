@@ -1,0 +1,30 @@
+[package]
+name = "observe-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Hashing for label redaction
+sha2 = "0.10"
+hex = "0.4"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# System calls (for thread ID on Linux)
+libc = "0.2"
+
+[dev-dependencies]
+# Testing
+tempfile = "3.8"

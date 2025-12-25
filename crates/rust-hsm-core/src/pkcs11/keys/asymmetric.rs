@@ -3,11 +3,13 @@ use cryptoki::mechanism::Mechanism;
 use cryptoki::object::{Attribute, ObjectHandle};
 use cryptoki::session::UserType;
 use cryptoki::types::AuthPin;
+use observe_cryptoki::{ObserveConfig, ObservedPkcs11};
 use std::fs;
 use tracing::{debug, info, trace};
 
 use super::utils::{find_token_slot, get_key_type, mechanism_name};
 
+#[allow(clippy::too_many_arguments)]
 pub fn sign(
     module_path: &str,
     label: &str,
@@ -16,15 +18,26 @@ pub fn sign(
     input_path: &str,
     output_path: &str,
     json: bool,
+    observe_enabled: bool,
+    observe_log_file: &str,
 ) -> anyhow::Result<()> {
     debug!("Loading PKCS#11 module for signing operation");
-    let pkcs11 = Pkcs11::new(module_path)?;
+
+    // Create observe config if enabled
+    let observe_config = if observe_enabled {
+        ObserveConfig::enabled(observe_log_file)?
+    } else {
+        ObserveConfig::disabled()
+    };
+
+    // Use observed wrapper if observability is enabled
+    let pkcs11 = ObservedPkcs11::new(module_path, observe_config)?;
     debug!("Initializing PKCS#11 library");
     debug!("→ Calling C_Initialize");
     pkcs11.initialize(CInitializeArgs::OsThreads)?;
 
     debug!("Finding token slot for label: {}", label);
-    let slot = find_token_slot(&pkcs11, label)?;
+    let slot = find_token_slot(pkcs11.inner(), label)?;
     info!("Signing data with key '{}' on token '{}'", key_label, label);
     debug!("Token found at slot: {}", usize::from(slot));
 
@@ -38,11 +51,11 @@ pub fn sign(
     // Find private key by label
     debug!("Searching for private key with label: {}", key_label);
     debug!("→ Calling C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal");
-    let key_handle = find_key_by_label(&session, key_label, true)?;
+    let key_handle = find_key_by_label(session.inner(), key_label, true)?;
     debug!("Private key found with handle: {:?}", key_handle);
 
     // Detect key type
-    let key_type = get_key_type(&session, key_handle)?;
+    let key_type = get_key_type(session.inner(), key_handle)?;
 
     // Read input data
     debug!("Reading input data from: {}", input_path);

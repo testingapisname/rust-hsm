@@ -5,6 +5,9 @@ edition = "2021"
 
 [dependencies]
 rust-hsm-core = { path = "../rust-hsm-core" }
+observe-core = { path = "../observe-core" }
+observe-cryptoki = { path = "../observe-cryptoki" }
+cryptoki = "0.10"
 clap = { version = "4.5", features = ["derive"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

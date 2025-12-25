@@ -1,0 +1,13 @@
+[package]
+name = "observe-cryptoki"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+observe-core = { path = "../observe-core" }
+cryptoki = "0.10"
+anyhow = "1.0"
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3.8"
