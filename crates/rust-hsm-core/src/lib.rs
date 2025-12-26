@@ -29,7 +29,8 @@
 //!     "user-pin",
 //!     "signing-key",
 //!     "rsa",
-//!     Some(2048),
+//!     2048,
+//!     false,
 //!     false,
 //! ).expect("Failed to generate keypair");
 //! ```

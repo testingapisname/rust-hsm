@@ -631,4 +631,14 @@ pub enum Commands {
         #[arg(long = "pin-stdin")]
         pin_stdin: bool,
     },
+
+    /// Analyze PKCS#11 observability logs and display statistics
+    Analyze {
+        /// Path to log file (JSON Lines format from observe-core)
+        #[arg(long)]
+        log_file: String,
+        /// Output format (text or json)
+        #[arg(long, default_value = "text")]
+        format: String,
+    },
 }

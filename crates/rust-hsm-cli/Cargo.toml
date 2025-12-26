@@ -7,6 +7,7 @@ edition = "2021"
 rust-hsm-core = { path = "../rust-hsm-core" }
 observe-core = { path = "../observe-core" }
 observe-cryptoki = { path = "../observe-cryptoki" }
+rust-hsm-analyze = { path = "../rust-hsm-analyze" }
 cryptoki = "0.10"
 clap = { version = "4.5", features = ["derive"] }
 tracing = "0.1"
@@ -15,6 +16,7 @@ anyhow = "1.0"
 toml = "0.8"
 dirs = "5.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [dev-dependencies]
 tempfile = "3.13"

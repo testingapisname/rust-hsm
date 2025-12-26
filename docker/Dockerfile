@@ -15,6 +15,7 @@ COPY crates/rust-hsm-core/Cargo.toml crates/rust-hsm-core/Cargo.toml
 COPY crates/rust-hsm-cli/Cargo.toml crates/rust-hsm-cli/Cargo.toml
 COPY crates/observe-core/Cargo.toml crates/observe-core/Cargo.toml
 COPY crates/observe-cryptoki/Cargo.toml crates/observe-cryptoki/Cargo.toml
+COPY crates/rust-hsm-analyze/Cargo.toml crates/rust-hsm-analyze/Cargo.toml
 
 # Create dummy files with proper module structure to build dependencies
 RUN mkdir -p crates/rust-hsm-core/src/keys && \
@@ -30,8 +31,11 @@ RUN mkdir -p crates/rust-hsm-core/src/keys && \
     mkdir -p crates/observe-cryptoki/src && \
     echo "pub mod config; pub mod pkcs11; pub mod session;" > crates/observe-cryptoki/src/lib.rs && \
     for f in config pkcs11 session; do echo "pub fn dummy() {}" > crates/observe-cryptoki/src/$f.rs; done && \
+    mkdir -p crates/rust-hsm-analyze/src && \
+    echo "pub mod analyzer; pub mod parser;" > crates/rust-hsm-analyze/src/lib.rs && \
+    for f in analyzer parser; do echo "pub fn dummy() {}" > crates/rust-hsm-analyze/src/$f.rs; done && \
     cargo build --release && \
-    rm -rf target/release/deps/rust_hsm_cli* target/release/deps/rust_hsm_core* target/release/deps/observe_core* target/release/deps/observe_cryptoki*
+    rm -rf target/release/deps/rust_hsm_cli* target/release/deps/rust_hsm_core* target/release/deps/observe_core* target/release/deps/observe_cryptoki* target/release/deps/rust_hsm_analyze*
 
 # Copy real source and build actual binaries
 COPY crates/rust-hsm-core/src crates/rust-hsm-core/src
@@ -39,11 +43,13 @@ COPY crates/rust-hsm-cli/src crates/rust-hsm-cli/src
 COPY crates/rust-hsm-cli/examples crates/rust-hsm-cli/examples
 COPY crates/observe-core/src crates/observe-core/src
 COPY crates/observe-cryptoki/src crates/observe-cryptoki/src
+COPY crates/rust-hsm-analyze/src crates/rust-hsm-analyze/src
 # Force rebuild by touching source files
 RUN find crates/rust-hsm-core/src -name "*.rs" -exec touch {} + && \
     find crates/rust-hsm-cli/src -name "*.rs" -exec touch {} + && \
     find crates/observe-core/src -name "*.rs" -exec touch {} + && \
-    find crates/observe-cryptoki/src -name "*.rs" -exec touch {} +
+    find crates/observe-cryptoki/src -name "*.rs" -exec touch {} + && \
+    find crates/rust-hsm-analyze/src -name "*.rs" -exec touch {} +
 # Test observe-core first, then build CLI and examples
 RUN cargo test --release -p observe-core && \
     cargo build --release --bin rust-hsm-cli && \
@@ -108,7 +114,9 @@ COPY docker/softhsm2.conf /etc/softhsm2.conf
 COPY docker/entrypoint.sh /entrypoint.sh
 COPY test.sh /app/test.sh
 COPY cleanup-test-tokens.sh /app/cleanup-test-tokens.sh
-COPY config.example.toml /app/.rust-hsm.toml
+COPY config.default.toml /app/.rust-hsm.toml
+COPY config.example.toml /app/config.example.toml
+COPY test-data/*.txt /app/
 RUN chmod +x /entrypoint.sh /app/test.sh /app/cleanup-test-tokens.sh
 
 # Set environment variables

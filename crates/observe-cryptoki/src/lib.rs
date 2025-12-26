@@ -6,12 +6,13 @@
 //! # Example
 //! ```no_run
 //! use observe_cryptoki::{ObservedPkcs11, ObserveConfig};
+//! use cryptoki::context::CInitializeArgs;
 //!
-//! let config = ObserveConfig::enabled("/app/observe.jsonl");
+//! let config = ObserveConfig::enabled("/app/observe.jsonl")?;
 //! let pkcs11 = ObservedPkcs11::new("/usr/lib/softhsm/libsofthsm2.so", config)?;
 //!
 //! // All operations are automatically logged
-//! pkcs11.initialize(Default::default())?;
+//! pkcs11.initialize(CInitializeArgs::OsThreads)?;
 //! # Ok::<(), anyhow::Error>(())
 //! ```
 

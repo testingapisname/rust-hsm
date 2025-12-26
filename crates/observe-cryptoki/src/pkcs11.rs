@@ -73,7 +73,7 @@ impl ObservedPkcs11 {
     /// Open a read-write session
     pub fn open_rw_session(&self, slot: Slot) -> Result<ObservedSession, Error> {
         let start = Instant::now();
-        let slot_id: u64 = u64::from(slot);
+        let slot_id = slot.id();
         tracing::debug!("→ Calling C_OpenSession (slot {})", slot_id);
 
         let result = self.inner.open_rw_session(slot);
@@ -103,7 +103,7 @@ impl ObservedPkcs11 {
     /// Open a read-only session
     pub fn open_ro_session(&self, slot: Slot) -> Result<ObservedSession, Error> {
         let start = Instant::now();
-        let slot_id: u64 = u64::from(slot);
+        let slot_id = slot.id();
         tracing::debug!("→ Calling C_OpenSession (read-only, slot {})", slot_id);
 
         let result = self.inner.open_ro_session(slot);

@@ -1,0 +1,2 @@
+Test data for signing operations.
+This file is pre-installed in the Docker container for testing.

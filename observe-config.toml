@@ -1,0 +1,4 @@
+default_token_label = "OBSERVE_TEST"
+pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"
+observe_enabled = true
+observe_log_file = "/app/rust-hsm-observe.json"

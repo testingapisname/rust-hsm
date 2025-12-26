@@ -1,0 +1,15 @@
+# Default rust-hsm configuration
+# This file is copied to /app/.rust-hsm.toml in the Docker container
+
+# Default token label (used when --label is not specified)
+default_token_label = "DEV_TOKEN"
+
+# PKCS#11 module path (default: SoftHSM2)
+# Switch to Kryoptic: /usr/lib/kryoptic/libkryoptic_pkcs11.so
+pkcs11_module = "/usr/lib/softhsm/libsofthsm2.so"
+
+# Enable PKCS#11 observability logging
+observe_enabled = true
+
+# Path to observability log file (JSON Lines format)
+observe_log_file = "/app/rust-hsm-observe.json"

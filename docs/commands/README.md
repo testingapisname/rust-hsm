@@ -50,6 +50,10 @@ Complete reference for all `rust-hsm-cli` commands with flags, options, and exam
 - [gen-csr](security-utilities.md#gen-csr) - Generate Certificate Signing Request
 - [gen-random](security-utilities.md#gen-random) - Generate random bytes
 
+### Observability & Analysis
+- [analyze](observability.md#analyze) - Analyze PKCS#11 operation logs and display statistics
+- [gen-random](security-utilities.md#gen-random) - Generate random bytes
+
 ### Troubleshooting & Diagnostics
 - [explain-error](troubleshooting.md#explain-error) - Decode PKCS#11 error codes with context-aware troubleshooting
 - [find-key](troubleshooting.md#find-key) - Search for keys with fuzzy matching

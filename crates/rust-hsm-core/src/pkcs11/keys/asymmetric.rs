@@ -9,6 +9,20 @@ use tracing::{debug, info, trace};
 
 use super::utils::{find_token_slot, get_key_type, mechanism_name};
 
+// TODO: Observability Integration Status & Testing
+// - ✅ sign() - Fully integrated with observe-cryptoki wrappers (7 events logged)
+// - ❌ verify() - Still uses raw cryptoki, needs observe wrappers
+// - ❌ encrypt() - Still uses raw cryptoki, needs observe wrappers
+// - ❌ decrypt() - Still uses raw cryptoki, needs observe wrappers
+//
+// TODO: Add integration tests for observability:
+// - Test that sign() creates expected log file with 7 events
+// - Test that C_Sign event includes mechanism, key type, data size
+// - Test that all 7 events have correlation op_id
+// - Test that no PINs appear in logs (redaction validation)
+// - Test duration tracking (all events have dur_ms > 0)
+// - Add similar tests when other operations get observability
+
 #[allow(clippy::too_many_arguments)]
 pub fn sign(
     module_path: &str,
