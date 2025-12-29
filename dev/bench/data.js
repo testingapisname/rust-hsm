@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1767035339337,
+  "lastUpdate": 1767036391240,
   "repoUrl": "https://github.com/testingapisname/rust-hsm",
   "entries": {
     "HSM Performance Benchmarks": [
@@ -267,6 +267,140 @@ window.BENCHMARK_DATA = {
           {
             "name": "SHA-256 Hash (1MB)",
             "value": 1353.000659154861,
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eilersjames15@gmail.com",
+            "name": "James Eilers",
+            "username": "testingapisname"
+          },
+          "committer": {
+            "email": "eilersjames15@gmail.com",
+            "name": "James Eilers",
+            "username": "testingapisname"
+          },
+          "distinct": true,
+          "id": "fa6a43c66e63a7e28f5f055fedda96743035ec77",
+          "message": "refactor: Transform CLI to modular architecture\n\n- Refactor 842-line main.rs into clean 35-line entry point\n- Organize commands into focused modules by category:\n  * info.rs - Information and listing commands\n  * token.rs - Token management operations\n  * keys.rs - Key management operations\n  * crypto.rs - Sign/verify/encrypt/decrypt operations\n  * symmetric.rs - Symmetric key operations\n  * key_wrap.rs - Key wrapping/unwrapping\n  * mac.rs - HMAC and CMAC operations\n  * util.rs - Utility commands (benchmark, audit, troubleshooting)\n  * analyze.rs - Observability log analysis\n- Add commands/common.rs for shared utilities (PIN handling, config)\n- Implement commands/mod.rs as main dispatcher with routing logic\n- All 55 integration tests pass - no functionality lost\n- Update documentation with CLI_ARCHITECTURE.md\n- Improve maintainability, testability, and extensibility\n\nBreaking: None (full backward compatibility maintained)\nFeatures: Modular command architecture for easier maintenance",
+          "timestamp": "2025-12-29T13:23:57-06:00",
+          "tree_id": "507089a77ed7f005ba4122a5bb4426b9a8ace86f",
+          "url": "https://github.com/testingapisname/rust-hsm/commit/fa6a43c66e63a7e28f5f055fedda96743035ec77"
+        },
+        "date": 1767036390850,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "RSA-2048 Sign",
+            "value": 901.2430322422758,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-4096 Sign",
+            "value": 175.94920726436567,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-256 Sign",
+            "value": 11584.379344866278,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-384 Sign",
+            "value": 1028.0935824239589,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Verify",
+            "value": 18022.655198490713,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P256 Verify",
+            "value": 8129.163961009928,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Encrypt",
+            "value": 18509.880574250536,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 27601.83143671949,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 410047.8115748296,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-384 Hash (1KB)",
+            "value": 293829.0032732551,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-512 Hash (1KB)",
+            "value": 294053.6471473856,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "HMAC-SHA256",
+            "value": 31687.12387383962,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-CMAC",
+            "value": 32877.60587904197,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "Random (32 bytes)",
+            "value": 643045.4633142563,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 28244.486535005937,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 410890.23478268017,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (10KB)",
+            "value": 23168.32389687501,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (10KB)",
+            "value": 116165.06591205839,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (100KB)",
+            "value": 4712.1001076243665,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (100KB)",
+            "value": 9545.274573641222,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1MB)",
+            "value": 380.97369516071285,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1MB)",
+            "value": 1326.8648847118945,
             "unit": "ops/sec"
           }
         ]
