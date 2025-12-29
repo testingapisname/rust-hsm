@@ -1146,7 +1146,7 @@ fn output_json(
         let mut file = File::create(path)?;
         file.write_all(json.as_bytes())?;
         eprintln!("✓ Benchmark results written to {}", path);
-        
+
         // Also generate GitHub Actions format (array of name/value/unit)
         if path.ends_with(".json") {
             let gh_path = path.replace(".json", "-gh.json");
@@ -1168,7 +1168,7 @@ fn output_github_format(results: &[BenchmarkResult], path: &str) -> Result<()> {
         value: f64,
         unit: String,
     }
-    
+
     let gh_results: Vec<GitHubBenchmark> = results
         .iter()
         .map(|r| GitHubBenchmark {
@@ -1177,11 +1177,11 @@ fn output_github_format(results: &[BenchmarkResult], path: &str) -> Result<()> {
             unit: "ops/sec".to_string(),
         })
         .collect();
-    
+
     let json = serde_json::to_string_pretty(&gh_results)?;
     let mut file = File::create(path)?;
     file.write_all(json.as_bytes())?;
-    
+
     Ok(())
 }
 
