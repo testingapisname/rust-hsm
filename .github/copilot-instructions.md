@@ -192,9 +192,13 @@ Keep this pattern; observability layers should complement, not replace.
 ---
 
 ## CLI Conventions
-- Use `clap` derive macros; keep subcommands in `cli.rs`, dispatch in `main.rs`.
-- Keep operations in `pkcs11/*` modules.
-- Add tests to `test.sh` when introducing core ops.
+- **Modular Architecture**: Commands are organized into focused handlers in `src/commands/`
+- **Entry Point**: `main.rs` is now a clean 35-line file with configuration and dispatch
+- **Command Handlers**: Each category (info, token, keys, crypto, etc.) has its own module
+- **Shared Utilities**: Common functionality (PIN handling, config) in `commands/common.rs`
+- Use `clap` derive macros; keep subcommands in `cli.rs`, dispatch via `commands::dispatch_command`
+- Keep core operations in `rust-hsm-core/src/pkcs11/*` modules
+- Add tests to `test.sh` when introducing core ops
 
 ---
 
@@ -398,12 +402,24 @@ let key_handle = session.find_objects(&template)?.first().copied()
 ## Adding New Commands
 
 1. Add variant to `Commands` enum in [cli.rs](../crates/rust-hsm-cli/src/cli.rs)
-2. Implement function in appropriate `pkcs11/*.rs` module
-3. Add export to [pkcs11/keys/mod.rs](../crates/rust-hsm-cli/src/pkcs11/keys/mod.rs) if needed
-4. Add match arm in [main.rs](../crates/rust-hsm-cli/src/main.rs) to dispatch to your function
-5. Add test case to [test.sh](../test.sh) for SoftHSM2
-6. Add test case to [testKryoptic.sh](../testKryoptic.sh) for Kryoptic
-7. Update command documentation in [docs/commands/](../docs/commands/)
+2. Implement function in appropriate `rust-hsm-core/src/pkcs11/*.rs` module
+3. Add handler to appropriate `commands/*.rs` module (or create new category)
+4. Update dispatcher in [commands/mod.rs](../crates/rust-hsm-cli/src/commands/mod.rs) 
+5. Use shared utilities from [commands/common.rs](../crates/rust-hsm-cli/src/commands/common.rs) for PIN handling and config
+6. Add test case to [test.sh](../test.sh) for SoftHSM2
+7. Add test case to [testKryoptic.sh](../testKryoptic.sh) for Kryoptic
+8. Update command documentation in [docs/commands/](../docs/commands/)
+
+**Command Handler Categories:**
+- `info.rs` - Information and listing commands
+- `token.rs` - Token management operations  
+- `keys.rs` - Key management operations
+- `crypto.rs` - Cryptographic operations (sign, verify, encrypt, decrypt)
+- `symmetric.rs` - Symmetric key operations
+- `key_wrap.rs` - Key wrapping/unwrapping
+- `mac.rs` - HMAC and CMAC operations
+- `util.rs` - Utility commands (benchmark, audit, troubleshooting)
+- `analyze.rs` - Observability log analysis
 
 ---
 

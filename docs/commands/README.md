@@ -2,6 +2,10 @@
 
 Complete reference for all `rust-hsm-cli` commands with flags, options, and example outputs.
 
+## Architecture
+
+See [CLI Architecture](../CLI_ARCHITECTURE.md) for details on the modular command structure introduced in December 2025.
+
 ## Command Categories
 
 ### Token Management
