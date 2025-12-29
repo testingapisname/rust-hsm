@@ -44,13 +44,15 @@ jobs:
             --format json --output /app/benchmark-results.json
       
       - name: Copy results
-        run: docker cp rust-hsm-app:/app/benchmark-results.json ./benchmark-results.json
+        run: |
+          docker cp rust-hsm-app:/app/benchmark-results.json ./benchmark-results.json
+          docker cp rust-hsm-app:/app/benchmark-results-gh.json ./benchmark-results-gh.json
       
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: 'customBiggerIsBetter'
-          output-file-path: benchmark-results.json
+          output-file-path: benchmark-results-gh.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           # Show alert with commit comment on detecting possible performance regression
