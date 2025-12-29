@@ -98,7 +98,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           gh-pages-branch: gh-pages
-          benchmark-data-dir-path: dev/bench
           # Show alert with commit comment on detecting possible performance regression
           alert-threshold: '150%'  # Alert if performance degrades by 50%
           comment-on-alert: true
@@ -155,7 +154,7 @@ jobs:
               comment += '| No results available | - | - | - | - |\n';
             }
             
-            comment += '\n📈 [View historical results](https://testingapisname.github.io/rust-hsm/dev/bench/)\n';
+            comment += '\n📈 [View historical results](https://testingapisname.github.io/rust-hsm/)\n';
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
