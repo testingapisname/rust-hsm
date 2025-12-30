@@ -3,21 +3,34 @@
 use anyhow::Result;
 
 pub fn handle_analyze(log_file: String, format: String) -> Result<()> {
-    use rust_hsm_analyze::{parse_observe_json, Analyzer};
+    use rust_hsm_analyze::{parse_log, Analyzer};
 
-    // Parse the log file
-    let events = parse_observe_json(&log_file)?;
+    // Parse the log file (auto-detects format: observe JSON or pkcs11-spy)
+    let events = parse_log(&log_file)?;
 
     if events.is_empty() {
         println!("No events found in log file");
         return Ok(());
     }
 
-    // Analyze the events
+    // Handle raw events output formats first (before moving events into analyzer)
+    if format == "events" {
+        // Output raw events as JSON Lines (one JSON object per line)
+        for event in &events {
+            println!("{}", serde_json::to_string(event)?);
+        }
+        return Ok(());
+    } else if format == "pretty-events" {
+        // Output raw events as pretty-printed JSON array
+        println!("{}", serde_json::to_string_pretty(&events)?);
+        return Ok(());
+    }
+
+    // Analyze the events (this consumes events)
     let analyzer = Analyzer::new(events);
     let analysis = analyzer.analyze();
 
-    // Output results
+    // Output analysis results
     if format == "json" {
         println!("{}", serde_json::to_string_pretty(&analysis)?);
     } else {

@@ -634,10 +634,10 @@ pub enum Commands {
 
     /// Analyze PKCS#11 observability logs and display statistics
     Analyze {
-        /// Path to log file (JSON Lines format from observe-core)
+        /// Path to log file (JSON Lines format from observe-core or pkcs11-spy plaintext)
         #[arg(long)]
         log_file: String,
-        /// Output format (text or json)
+        /// Output format: text (analysis), json (analysis as JSON), events (raw JSON lines), pretty-events (formatted JSON array)
         #[arg(long, default_value = "text")]
         format: String,
     },

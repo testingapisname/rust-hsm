@@ -19,4 +19,4 @@ pub mod analyzer;
 pub mod parser;
 
 pub use analyzer::{Analyzer, SessionAnalysis};
-pub use parser::{parse_observe_json, LogFormat};
+pub use parser::{parse_log, parse_observe_json, LogFormat};
