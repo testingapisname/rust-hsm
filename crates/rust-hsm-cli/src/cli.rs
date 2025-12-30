@@ -641,4 +641,11 @@ pub enum Commands {
         #[arg(long, default_value = "text")]
         format: String,
     },
+
+    /// Launch interactive terminal interface for guided HSM operations
+    Interactive {
+        /// Token label (uses config default if not specified)
+        #[arg(long)]
+        label: Option<String>,
+    },
 }

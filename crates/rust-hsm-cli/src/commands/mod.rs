@@ -12,6 +12,7 @@ pub mod analyze;
 pub mod common;
 pub mod crypto;
 pub mod info;
+pub mod interactive;
 pub mod key_wrap;
 pub mod keys;
 pub mod mac;
@@ -353,5 +354,11 @@ pub fn dispatch_command(command: Commands, config: Config) -> Result<()> {
 
         // Analysis command
         Commands::Analyze { log_file, format } => analyze::handle_analyze(log_file, format),
+
+        // Interactive command
+        Commands::Interactive { label } => {
+            let token_label = ctx.token_label(label).ok();
+            interactive::run_interactive(ctx.config, token_label)
+        }
     }
 }

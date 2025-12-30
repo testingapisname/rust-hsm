@@ -23,15 +23,24 @@ use cli::Cli;
 use config::Config;
 
 fn main() -> anyhow::Result<()> {
-    // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
-
     let cli = Cli::parse();
+
+    // Initialize tracing only if not running interactive command
+    // (interactive TUI doesn't work with tracing output to stderr)
+    match &cli.command {
+        cli::Commands::Interactive { .. } => {
+            // No logging for TUI to prevent display corruption
+        }
+        _ => {
+            // Initialize tracing for all other commands
+            tracing_subscriber::fmt()
+                .with_env_filter(
+                    tracing_subscriber::EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+                )
+                .init();
+        }
+    }
 
     // Load configuration
     let config = Config::load_with_custom_path(cli.config);
