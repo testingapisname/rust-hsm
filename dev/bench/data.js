@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1767036914897,
+  "lastUpdate": 1767067583195,
   "repoUrl": "https://github.com/testingapisname/rust-hsm",
   "entries": {
     "HSM Performance Benchmarks": [
@@ -533,6 +533,140 @@ window.BENCHMARK_DATA = {
           {
             "name": "SHA-256 Hash (1MB)",
             "value": 1356.24666871912,
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eilersjames15@gmail.com",
+            "name": "James Eilers",
+            "username": "testingapisname"
+          },
+          "committer": {
+            "email": "eilersjames15@gmail.com",
+            "name": "James Eilers",
+            "username": "testingapisname"
+          },
+          "distinct": true,
+          "id": "2779bf3f6ab6c4ea8a58b12f8a0e5b4993229cce",
+          "message": "Implement comprehensive PKCS#11 observability system\n\n- Add rust-hsm-analyze crate for parsing pkcs11-spy logs into structured JSON\n- Implement enhanced template parser with rich contextual data capture\n- Add analyze command to CLI with multiple output formats (text, JSON, events, pretty-events)\n- Add comprehensive observability documentation with real-world examples\n- Support complete session analysis with timing statistics and operation flow\n- Create 'Wireshark for PKCS#11' experience with detailed HSM operation visibility\n- Include performance monitoring, security auditing, and debugging capabilities\n- Add integration examples for Prometheus, ELK stack, and Grafana dashboards\n- Format code with cargo fmt for consistency",
+          "timestamp": "2025-12-29T22:04:02-06:00",
+          "tree_id": "0e33be77ea48098dc123f9c45d95e3ff8dda3fea",
+          "url": "https://github.com/testingapisname/rust-hsm/commit/2779bf3f6ab6c4ea8a58b12f8a0e5b4993229cce"
+        },
+        "date": 1767067582581,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "RSA-2048 Sign",
+            "value": 1440.52955249258,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-4096 Sign",
+            "value": 191.06364239363967,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-256 Sign",
+            "value": 15991.801962641872,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-384 Sign",
+            "value": 1079.3684908548237,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Verify",
+            "value": 24138.834992234537,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P256 Verify",
+            "value": 10044.864382277001,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Encrypt",
+            "value": 24716.403980725157,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 45745.361191648364,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 465974.53915118077,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-384 Hash (1KB)",
+            "value": 311392.61003057874,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-512 Hash (1KB)",
+            "value": 309632.0332916362,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "HMAC-SHA256",
+            "value": 53228.97615128953,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-CMAC",
+            "value": 49548.80854934962,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "Random (32 bytes)",
+            "value": 857427.0329594952,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 44537.59730351571,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 460710.6000294855,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (10KB)",
+            "value": 30789.883675819474,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (10KB)",
+            "value": 77476.2574009195,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (100KB)",
+            "value": 6800.063050184601,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (100KB)",
+            "value": 11738.23822660575,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1MB)",
+            "value": 591.4295074756039,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1MB)",
+            "value": 1089.2774879065146,
             "unit": "ops/sec"
           }
         ]
