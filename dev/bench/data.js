@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1767067583195,
+  "lastUpdate": 1767114962053,
   "repoUrl": "https://github.com/testingapisname/rust-hsm",
   "entries": {
     "HSM Performance Benchmarks": [
@@ -667,6 +667,140 @@ window.BENCHMARK_DATA = {
           {
             "name": "SHA-256 Hash (1MB)",
             "value": 1089.2774879065146,
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "eilersjames15@gmail.com",
+            "name": "James Eilers",
+            "username": "testingapisname"
+          },
+          "committer": {
+            "email": "eilersjames15@gmail.com",
+            "name": "James Eilers",
+            "username": "testingapisname"
+          },
+          "distinct": true,
+          "id": "7fd8aacb7998f4f28423040374fbe3d248bb6bf9",
+          "message": "feat: Add Interactive TUI mode with scrollable command output\n\n- Implement complete TUI framework using ratatui 0.28 + crossterm 0.28\n- Add Interactive command to CLI with 6 menu categories\n- Implement real PKCS#11 command execution for info and list-slots\n- Add comprehensive scrolling system with PageUp/PageDown support\n- Fix scrolling logic consistency between render and scroll methods\n- Disable tracing for interactive mode to prevent TUI corruption\n- Add demo script and comprehensive documentation\n- Support both SoftHSM2 and Kryoptic HSM providers\n\nTUI Features:\n- Menu-driven interface with hierarchical navigation\n- Real-time status feedback with emojis and progress indicators\n- Scrollable command output for large results (tested with 146+ lines)\n- Graceful error handling and recovery\n- Clean terminal management and proper cleanup\n\nArchitecture:\n- crates/rust-hsm-cli/src/commands/interactive.rs (765 lines)\n- Modular command execution with real PKCS#11 integration\n- Consistent error handling and status management\n- Memory-safe PKCS#11 lifecycle (initialize/finalize)\n\nTested extensively in Docker with multiple HSM providers and various\noutput sizes. Foundation ready for expanding to full PKCS#11 functionality.",
+          "timestamp": "2025-12-30T11:12:52-06:00",
+          "tree_id": "a0239c0527a426c8e6d44de40a53bd2ebfa01c30",
+          "url": "https://github.com/testingapisname/rust-hsm/commit/7fd8aacb7998f4f28423040374fbe3d248bb6bf9"
+        },
+        "date": 1767114961800,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "RSA-2048 Sign",
+            "value": 913.4995409208058,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-4096 Sign",
+            "value": 175.98600868994274,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-256 Sign",
+            "value": 11811.574208813512,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-384 Sign",
+            "value": 1018.6392442462825,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Verify",
+            "value": 18176.0415053543,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P256 Verify",
+            "value": 8640.577881848738,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Encrypt",
+            "value": 18676.040544936983,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 28586.146353065207,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 405087.9040751843,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-384 Hash (1KB)",
+            "value": 292401.08071439434,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-512 Hash (1KB)",
+            "value": 289685.45952804445,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "HMAC-SHA256",
+            "value": 31821.453642188117,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-CMAC",
+            "value": 32640.633802770928,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "Random (32 bytes)",
+            "value": 640976.3351537061,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 27979.400446215477,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 403645.72821725823,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (10KB)",
+            "value": 23221.34915109714,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (10KB)",
+            "value": 112364.85317284636,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (100KB)",
+            "value": 4687.092955271166,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (100KB)",
+            "value": 9469.453059542406,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1MB)",
+            "value": 382.5493386314887,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1MB)",
+            "value": 1330.2205463098724,
             "unit": "ops/sec"
           }
         ]
