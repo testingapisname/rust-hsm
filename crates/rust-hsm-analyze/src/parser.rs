@@ -536,7 +536,7 @@ fn extract_mechanism(inputs: &[String]) -> Option<String> {
 
 /// Generate contextual hints based on function call
 fn generate_hint(call: &Pkcs11SpyCall) -> Option<String> {
-    match call.function.as_str() {
+    let base_hint = match call.function.as_str() {
         "C_Initialize" => Some("PKCS#11 library initialization".to_string()),
         "C_Finalize" => Some("PKCS#11 library cleanup".to_string()),
         "C_GetSlotList" => Some("Token discovery".to_string()),
@@ -587,7 +587,10 @@ fn generate_hint(call: &Pkcs11SpyCall) -> Option<String> {
                 None
             }
         }
-    }
+    };
+
+    // Add pkcs11-spy source indicator to all hints
+    base_hint.map(|hint| format!("{} (via pkcs11-spy)", hint))
 }
 ///
 /// Detects format by examining file content:
@@ -706,14 +709,14 @@ mod tests {
         writeln!(temp_file, "1: Calling C_Initialize").unwrap();
         writeln!(temp_file, "2: [in] pInitArgs = 0x7ffd12345678").unwrap();
         writeln!(temp_file, "3: [out] *pInitArgs = CK_C_INITIALIZE_ARGS...").unwrap();
-        writeln!(temp_file, "4: Returned: 0 CKR_OK").unwrap();
+        writeln!(temp_file, "Returned: 0 CKR_OK").unwrap();
         writeln!(temp_file, "").unwrap();
         writeln!(temp_file, "0: C_GetSlotList").unwrap();
         writeln!(temp_file, "1: Calling C_GetSlotList").unwrap();
         writeln!(temp_file, "2: [in] tokenPresent = FALSE (0)").unwrap();
         writeln!(temp_file, "3: [in] pSlotList = NULL_PTR").unwrap();
         writeln!(temp_file, "4: [in,out] *pulCount = 2").unwrap();
-        writeln!(temp_file, "5: Returned: 0 CKR_OK").unwrap();
+        writeln!(temp_file, "Returned: 0 CKR_OK").unwrap();
         temp_file.flush().unwrap();
 
         let events = parse_pkcs11_spy(temp_file.path()).unwrap();
@@ -744,7 +747,7 @@ mod tests {
         let mut spy_file = NamedTempFile::new().unwrap();
         writeln!(spy_file, "0: C_Initialize").unwrap();
         writeln!(spy_file, "1: Calling C_Initialize").unwrap();
-        writeln!(spy_file, "2: Returned: 0 CKR_OK").unwrap();
+        writeln!(spy_file, "Returned: 0 CKR_OK").unwrap();
         spy_file.flush().unwrap();
 
         let format = detect_format(spy_file.path()).unwrap();
@@ -766,7 +769,7 @@ mod tests {
         let mut spy_file = NamedTempFile::new().unwrap();
         writeln!(spy_file, "0: C_GetSlotList").unwrap();
         writeln!(spy_file, "1: Calling C_GetSlotList").unwrap();
-        writeln!(spy_file, "2: Returned: 0 CKR_OK").unwrap();
+        writeln!(spy_file, "Returned: 0 CKR_OK").unwrap();
         spy_file.flush().unwrap();
 
         let events = parse_log(spy_file.path()).unwrap();
