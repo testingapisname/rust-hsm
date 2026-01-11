@@ -12,12 +12,12 @@ pub mod analyze;
 pub mod common;
 pub mod crypto;
 pub mod info;
-pub mod interactive;
 pub mod key_wrap;
 pub mod keys;
 pub mod mac;
 pub mod symmetric;
 pub mod token;
+pub mod tui;
 pub mod util;
 
 use common::CommandContext;
@@ -358,7 +358,7 @@ pub fn dispatch_command(command: Commands, config: Config) -> Result<()> {
         // Interactive command
         Commands::Interactive { label } => {
             let token_label = ctx.token_label(label).ok();
-            interactive::run_interactive(ctx.config, token_label)
+            tui::run_interactive(ctx.config, token_label)
         }
     }
 }
