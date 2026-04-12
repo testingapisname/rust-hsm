@@ -147,7 +147,7 @@ jobs:
         run: cargo install cargo-tarpaulin
       
       - name: Generate coverage
-        run: cargo tarpaulin --workspace --out Xml --output-dir coverage
+        run: cargo tarpaulin --workspace --lib --bins --out Xml --output-dir coverage
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
