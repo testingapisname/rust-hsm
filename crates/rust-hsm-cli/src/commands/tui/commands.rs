@@ -1,5 +1,5 @@
 //! TUI command execution logic
-//! 
+//!
 //! Handles all command execution, preserving current functionality
 //! while organizing it into a clean module structure.
 
@@ -73,13 +73,15 @@ pub fn execute_info_command(app: &mut InteractiveApp, command: &str) -> Result<(
             }
         }
         "list-mechanisms" => {
-            app.status = "🔧 40 mechanisms supported: RSA, ECDSA, AES-GCM, SHA-256, etc.".to_string();
+            app.status =
+                "🔧 40 mechanisms supported: RSA, ECDSA, AES-GCM, SHA-256, etc.".to_string();
         }
         "list-objects" => {
             if requires_token_access(app) {
                 return Ok(());
             }
-            app.status = "🔑 Found 3 objects: 2 keypairs (RSA-2048, P-256), 1 secret key (AES-256)".to_string();
+            app.status = "🔑 Found 3 objects: 2 keypairs (RSA-2048, P-256), 1 secret key (AES-256)"
+                .to_string();
         }
         _ => {
             app.status = format!("⚡ Command '{}' ready to execute (demo mode)", command);
@@ -95,7 +97,8 @@ fn execute_token_command(app: &mut InteractiveApp, command: &str) -> Result<()> 
             app.status = "🔧 Token initialization would be executed here (demo mode)".to_string();
         }
         "init-pin" => {
-            app.status = "🔐 User PIN initialization would be executed here (demo mode)".to_string();
+            app.status =
+                "🔐 User PIN initialization would be executed here (demo mode)".to_string();
         }
         "delete-token" => {
             app.status = "⚠️  Token deletion would be executed here (demo mode)".to_string();
@@ -126,7 +129,8 @@ fn execute_key_command(app: &mut InteractiveApp, command: &str) -> Result<()> {
             if requires_token_access(app) {
                 return Ok(());
             }
-            app.status = "🔍 Key 'interactive-key': RSA-2048, CKA_SIGN=true, CKA_DECRYPT=true".to_string();
+            app.status =
+                "🔍 Key 'interactive-key': RSA-2048, CKA_SIGN=true, CKA_DECRYPT=true".to_string();
         }
         "delete-key" => {
             if requires_token_access(app) {
@@ -246,19 +250,22 @@ fn execute_troubleshoot_command(app: &mut InteractiveApp, command: &str) -> Resu
             if requires_token_access(app) {
                 return Ok(());
             }
-            app.status = "🔍 Found 2 similar keys: 'interactive-key' (exact), 'test-key' (fuzzy)".to_string();
+            app.status = "🔍 Found 2 similar keys: 'interactive-key' (exact), 'test-key' (fuzzy)"
+                .to_string();
         }
         "diff-keys" => {
             if requires_token_access(app) {
                 return Ok(());
             }
-            app.status = "📊 Key comparison: 3 attributes differ (KeyType, Extractable, Sign)".to_string();
+            app.status =
+                "📊 Key comparison: 3 attributes differ (KeyType, Extractable, Sign)".to_string();
         }
         "audit-keys" => {
             if requires_token_access(app) {
                 return Ok(());
             }
-            app.status = "🛡️  Security audit: 5 keys checked, 1 warning (extractable key found)".to_string();
+            app.status =
+                "🛡️  Security audit: 5 keys checked, 1 warning (extractable key found)".to_string();
         }
         _ => {
             app.status = format!("⚡ Command '{}' ready to execute (demo mode)", command);
@@ -341,11 +348,11 @@ fn execute_list_slots_internal(app: &InteractiveApp) -> Result<Vec<String>> {
         let all_slots = pkcs11.get_all_slots().unwrap_or_default();
 
         let mut output = vec![];
-        
+
         // Initialized slots section (matches CLI output format)
         output.push("=== Initialized Slots ===".to_string());
         output.push("".to_string());
-        
+
         if slots_with_tokens.is_empty() {
             output.push("No initialized tokens found.".to_string());
         } else {
@@ -354,10 +361,13 @@ fn execute_list_slots_internal(app: &InteractiveApp) -> Result<Vec<String>> {
                     output.push(format!("Slot {}", slot.id()));
                     output.push(format!("  Description: {}", slot_info.slot_description()));
                     output.push(format!("  Manufacturer: {}", slot_info.manufacturer_id()));
-                    
+
                     if let Ok(token_info) = pkcs11.get_token_info(*slot) {
                         output.push(format!("  Token Label: {}", token_info.label()));
-                        output.push(format!("  Token Manufacturer: {}", token_info.manufacturer_id()));
+                        output.push(format!(
+                            "  Token Manufacturer: {}",
+                            token_info.manufacturer_id()
+                        ));
                         output.push(format!("  Token Model: {}", token_info.model()));
                         output.push(format!("  Token Serial: {}", token_info.serial_number()));
                     }
@@ -365,21 +375,24 @@ fn execute_list_slots_internal(app: &InteractiveApp) -> Result<Vec<String>> {
                 }
             }
         }
-        
+
         // All slots section (matches CLI output format)
         output.push("=== All Slots ===".to_string());
         output.push("".to_string());
-        
+
         for slot in &all_slots {
             if let Ok(slot_info) = pkcs11.get_slot_info(*slot) {
                 output.push(format!("Slot {}", slot.id()));
                 output.push(format!("  Description: {}", slot_info.slot_description()));
                 output.push(format!("  Manufacturer: {}", slot_info.manufacturer_id()));
-                
+
                 if slots_with_tokens.contains(slot) {
                     if let Ok(token_info) = pkcs11.get_token_info(*slot) {
                         output.push(format!("  Token Label: {}", token_info.label()));
-                        output.push(format!("  Token Manufacturer: {}", token_info.manufacturer_id()));
+                        output.push(format!(
+                            "  Token Manufacturer: {}",
+                            token_info.manufacturer_id()
+                        ));
                         output.push(format!("  Token Model: {}", token_info.model()));
                         output.push(format!("  Token Serial: {}", token_info.serial_number()));
                     }

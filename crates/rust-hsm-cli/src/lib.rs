@@ -1,5 +1,5 @@
 //! rust-hsm-cli library
-//! 
+//!
 //! This library provides the core functionality of the rust-hsm CLI tool,
 //! exposed for testing and potential library usage.
 

@@ -140,10 +140,16 @@ fn render_details(f: &mut Frame, area: ratatui::layout::Rect, app: &mut Interact
                     "Command Details".to_string(),
                 )
             } else {
-                (category.description().to_string(), "Description".to_string())
+                (
+                    category.description().to_string(),
+                    "Description".to_string(),
+                )
             }
         } else {
-            (category.description().to_string(), "Description".to_string())
+            (
+                category.description().to_string(),
+                "Description".to_string(),
+            )
         }
     } else {
         // Show main menu help
