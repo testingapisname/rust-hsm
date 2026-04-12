@@ -1,3 +1,4 @@
+use anyhow::Context;
 use cryptoki::context::{CInitializeArgs, Pkcs11};
 use cryptoki::mechanism::Mechanism;
 use cryptoki::object::Attribute;
@@ -137,8 +138,12 @@ pub fn encrypt_symmetric(
     let plaintext = fs::read(input_path)?;
     info!("Read {} bytes from {}", plaintext.len(), input_path);
 
-    // Generate random 96-bit (12-byte) IV for AES-GCM
-    let mut iv: Vec<u8> = (0..12).map(|_| rand::random::<u8>()).collect();
+    // Generate random 96-bit (12-byte) IV for AES-GCM using the HSM RNG
+    let mut iv = vec![0u8; 12];
+    debug!("→ Calling C_GenerateRandom");
+    session
+        .generate_random_slice(&mut iv)
+        .context("Failed to generate random IV")?;
     trace!("Generated IV: {} bytes", iv.len());
 
     // Encrypt using AES-GCM
