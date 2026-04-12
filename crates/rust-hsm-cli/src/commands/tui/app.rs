@@ -6,11 +6,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{
-    backend::CrosstermBackend,
-    widgets::ListState,
-    Terminal,
-};
+use ratatui::{backend::CrosstermBackend, widgets::ListState, Terminal};
 use std::io;
 use tracing::{debug, error, info};
 
@@ -52,7 +48,7 @@ impl InteractiveApp {
             selected_category: None,
             submenu_state: ListState::default(),
             status: String::from(
-                "Welcome to rust-hsm Interactive Interface! Use ↑/↓ to navigate, Enter to select."
+                "Welcome to rust-hsm Interactive Interface! Use ↑/↓ to navigate, Enter to select.",
             ),
             ctx,
             token_label,
@@ -300,7 +296,7 @@ mod tests {
     #[test]
     fn test_app_initialization() {
         let app = create_mock_app();
-        
+
         // Initial state should be main menu
         assert_eq!(app.selected_category, None);
         assert_eq!(app.menu_state.selected(), Some(0));
@@ -312,23 +308,23 @@ mod tests {
     #[test]
     fn test_menu_navigation() {
         let mut app = create_mock_app();
-        
+
         // Test initial state
         assert_eq!(app.menu_state.selected(), Some(0));
-        
+
         // Test navigation down
         app.next_item();
         assert_eq!(app.menu_state.selected(), Some(1));
-        
+
         // Test navigation up
         app.previous_item();
         assert_eq!(app.menu_state.selected(), Some(0));
-        
+
         // Test wrap-around (go to last item)
         app.previous_item();
         let categories = MenuCategory::all();
         assert_eq!(app.menu_state.selected(), Some(categories.len() - 1));
-        
+
         // Test wrap-around (go to first item)
         app.next_item();
         assert_eq!(app.menu_state.selected(), Some(0));
@@ -337,11 +333,11 @@ mod tests {
     #[test]
     fn test_category_selection() {
         let mut app = create_mock_app();
-        
+
         // Select first category (Information & Status)
         app.menu_state.select(Some(0));
         app.select_category();
-        
+
         assert_eq!(app.selected_category, Some(MenuCategory::Information));
         assert_eq!(app.submenu_state.selected(), Some(0));
         assert!(app.status.contains("Information"));
@@ -350,15 +346,15 @@ mod tests {
     #[test]
     fn test_submenu_navigation() {
         let mut app = create_mock_app();
-        
+
         // Enter a category first
         app.selected_category = Some(MenuCategory::Information);
         app.submenu_state.select(Some(0));
-        
+
         // Test submenu navigation
         app.next_item();
         assert_eq!(app.submenu_state.selected(), Some(1));
-        
+
         app.previous_item();
         assert_eq!(app.submenu_state.selected(), Some(0));
     }
@@ -366,16 +362,16 @@ mod tests {
     #[test]
     fn test_go_back() {
         let mut app = create_mock_app();
-        
+
         // Enter a category
         app.selected_category = Some(MenuCategory::Information);
         app.submenu_state.select(Some(2));
         app.command_output = vec!["test output".to_string()];
         app.scroll_offset = 5;
-        
+
         // Go back to main menu
         app.go_back();
-        
+
         assert_eq!(app.selected_category, None);
         assert_eq!(app.submenu_state.selected(), None);
         assert!(app.command_output.is_empty());
@@ -386,12 +382,12 @@ mod tests {
     #[test]
     fn test_scrolling_empty_output() {
         let mut app = create_mock_app();
-        
+
         // Test scrolling with no output
         app.scroll_down();
         assert_eq!(app.scroll_offset, 0);
         assert!(app.status.contains("No output to scroll"));
-        
+
         app.scroll_up();
         assert_eq!(app.scroll_offset, 0);
     }
@@ -399,14 +395,14 @@ mod tests {
     #[test]
     fn test_scrolling_short_output() {
         let mut app = create_mock_app();
-        
+
         // Add short output (less than scroll threshold)
         app.command_output = vec![
             "line1".to_string(),
             "line2".to_string(),
             "line3".to_string(),
         ];
-        
+
         app.scroll_down();
         assert_eq!(app.scroll_offset, 0);
         assert!(app.status.contains("too short to scroll"));
@@ -415,24 +411,24 @@ mod tests {
     #[test]
     fn test_scrolling_long_output() {
         let mut app = create_mock_app();
-        
+
         // Add long output (more than scroll threshold)
         app.command_output = (0..50).map(|i| format!("Line {}", i)).collect();
-        
+
         // Test scroll down
         app.scroll_down();
         assert!(app.scroll_offset > 0);
-        
+
         let first_scroll = app.scroll_offset;
-        
+
         // Test scroll down again
         app.scroll_down();
         assert!(app.scroll_offset > first_scroll);
-        
+
         // Test scroll up
         app.scroll_up();
         assert!(app.scroll_offset < first_scroll + 5);
-        
+
         // Test scroll bounds - can't go below 0
         app.scroll_offset = 0;
         app.scroll_up();
@@ -443,41 +439,50 @@ mod tests {
     #[test]
     fn test_scroll_bounds_enforcement() {
         let mut app = create_mock_app();
-        
+
         // Add output and test maximum scroll bounds
         app.command_output = (0..20).map(|i| format!("Line {}", i)).collect();
-        
+
         // Set offset to a valid position but near the end
         app.scroll_offset = 8; // Valid offset: less than max_scroll of 10
-        
+
         // The actual max_scroll logic from scroll_down method
         let min_lines_for_scroll = 10;
-        let expected_max_scroll = app.command_output.len().saturating_sub(min_lines_for_scroll);
-        
+        let expected_max_scroll = app
+            .command_output
+            .len()
+            .saturating_sub(min_lines_for_scroll);
+
         // Current scroll: 8, max_scroll: 20-10 = 10
         // After scroll_down: min(8+5, 10) = min(13, 10) = 10
         // So scroll_offset should be 10, which equals max_scroll
-        
+
         // Try to scroll down - should not exceed max scroll
         app.scroll_down();
-        
-        assert!(app.scroll_offset <= expected_max_scroll, 
-                "scroll_offset={} should be <= max_scroll={}", 
-                app.scroll_offset, expected_max_scroll);
-                
+
+        assert!(
+            app.scroll_offset <= expected_max_scroll,
+            "scroll_offset={} should be <= max_scroll={}",
+            app.scroll_offset,
+            expected_max_scroll
+        );
+
         // Try scrolling again - should stay at max_scroll
         app.scroll_down();
-        assert!(app.scroll_offset <= expected_max_scroll, 
-                "scroll_offset={} should still be <= max_scroll={} after second scroll", 
-                app.scroll_offset, expected_max_scroll);
+        assert!(
+            app.scroll_offset <= expected_max_scroll,
+            "scroll_offset={} should still be <= max_scroll={} after second scroll",
+            app.scroll_offset,
+            expected_max_scroll
+        );
     }
 
     #[test]
     fn test_help_display() {
         let mut app = create_mock_app();
-        
+
         app.show_help();
-        
+
         assert!(app.status.contains("Help:"));
         assert!(app.status.contains("↑/↓=Navigate"));
         assert!(app.status.contains("Enter=Select"));
@@ -487,13 +492,16 @@ mod tests {
     #[test]
     fn test_quit_category_handling() {
         let mut app = create_mock_app();
-        
+
         // Select quit category
         let categories = MenuCategory::all();
-        let quit_index = categories.iter().position(|c| matches!(c, MenuCategory::Quit)).unwrap();
+        let quit_index = categories
+            .iter()
+            .position(|c| matches!(c, MenuCategory::Quit))
+            .unwrap();
         app.menu_state.select(Some(quit_index));
         app.select_category();
-        
+
         // Should not enter the category, just show message
         assert_eq!(app.selected_category, None);
         assert!(app.status.contains("Use 'q' or Esc to quit"));
