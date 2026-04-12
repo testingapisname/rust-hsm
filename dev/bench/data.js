@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775358491558,
+  "lastUpdate": 1775963319802,
   "repoUrl": "https://github.com/testingapisname/rust-hsm",
   "entries": {
     "HSM Performance Benchmarks": [
@@ -2783,6 +2783,138 @@ window.BENCHMARK_DATA = {
           {
             "name": "SHA-256 Hash (1MB)",
             "value": 1354.3379593816169,
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "James Eilers",
+            "username": "testingapisname",
+            "email": "eilersjames15@gmail.com"
+          },
+          "committer": {
+            "name": "James Eilers",
+            "username": "testingapisname",
+            "email": "eilersjames15@gmail.com"
+          },
+          "id": "07381028c296f9102bbe6cbbd2fbd746ea5448e9",
+          "message": "feat: Refactor TUI into modular structure and fix display issues\n\n- Split TUI code into organized module structure (commands/tui/)\n  - app.rs: Core application state and event handling\n  - commands.rs: Command execution and HSM interaction\n  - menu.rs: Menu categories and navigation\n  - ui.rs: UI rendering and display formatting\n  - mod.rs: Module exports and entry point\n\n- Fix literal \\n characters showing in TUI command output\n- Update list-slots to display all slots with proper formatting\n- Add comprehensive TUI testing infrastructure (15 unit tests)\n- Create integration test framework for real HSM testing\n- Make TUI navigation methods public for testing access\n- Validate scrolling functionality with 18+ real HSM slots\n\nAll tests passing, TUI fully functional with real PKCS#11 data.\nModular architecture enables easier maintenance and testing.",
+          "timestamp": "2026-01-11T15:54:40Z",
+          "url": "https://github.com/testingapisname/rust-hsm/commit/07381028c296f9102bbe6cbbd2fbd746ea5448e9"
+        },
+        "date": 1775963319566,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "RSA-2048 Sign",
+            "value": 904.8964016686,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-4096 Sign",
+            "value": 175.22919023083108,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-256 Sign",
+            "value": 11811.342621300717,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-384 Sign",
+            "value": 1027.088451357882,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Verify",
+            "value": 17996.91460895944,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P256 Verify",
+            "value": 8646.509922734787,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Encrypt",
+            "value": 18398.241716835604,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 27873.367944623424,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 401081.31522584887,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-384 Hash (1KB)",
+            "value": 266368.33413243835,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-512 Hash (1KB)",
+            "value": 294122.83746183757,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "HMAC-SHA256",
+            "value": 31237.387904633502,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-CMAC",
+            "value": 32544.540458070915,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "Random (32 bytes)",
+            "value": 656064.6617330605,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 28299.815032408947,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 389532.4831137668,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (10KB)",
+            "value": 23319.90573161307,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (10KB)",
+            "value": 115436.3841630516,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (100KB)",
+            "value": 4653.831275905552,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (100KB)",
+            "value": 9569.050170338662,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1MB)",
+            "value": 390.9506405034262,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1MB)",
+            "value": 1346.7305731623371,
             "unit": "ops/sec"
           }
         ]
