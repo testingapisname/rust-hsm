@@ -235,10 +235,8 @@ fn get_detailed_object_info(
                     _ => "?".to_string(),
                 };
             }
-            Attribute::Token(val) => {
-                if val {
-                    flags.push("tok");
-                }
+            Attribute::Token(true) => {
+                flags.push("tok");
             }
             Attribute::Private(val) => {
                 if val {
@@ -261,68 +259,44 @@ fn get_detailed_object_info(
                     flags.push("imp");
                 }
             }
-            Attribute::Sign(val) => {
-                if val {
-                    flags.push("sig");
-                }
+            Attribute::Sign(true) => {
+                flags.push("sig");
             }
-            Attribute::Verify(val) => {
-                if val {
-                    flags.push("vfy");
-                }
+            Attribute::Verify(true) => {
+                flags.push("vfy");
             }
-            Attribute::Encrypt(val) => {
-                if val {
-                    flags.push("enc");
-                }
+            Attribute::Encrypt(true) => {
+                flags.push("enc");
             }
-            Attribute::Decrypt(val) => {
-                if val {
-                    flags.push("dec");
-                }
+            Attribute::Decrypt(true) => {
+                flags.push("dec");
             }
-            Attribute::Wrap(val) => {
-                if val {
-                    flags.push("wra");
-                }
+            Attribute::Wrap(true) => {
+                flags.push("wra");
             }
-            Attribute::Unwrap(val) => {
-                if val {
-                    flags.push("unw");
-                }
+            Attribute::Unwrap(true) => {
+                flags.push("unw");
             }
-            Attribute::Derive(val) => {
-                if val {
-                    flags.push("der");
-                }
+            Attribute::Derive(true) => {
+                flags.push("der");
             }
-            Attribute::Sensitive(val) => {
-                if val {
-                    flags.push("sen");
-                }
+            Attribute::Sensitive(true) => {
+                flags.push("sen");
             }
-            Attribute::AlwaysSensitive(val) => {
-                if val {
-                    flags.push("ase");
-                }
+            Attribute::AlwaysSensitive(true) => {
+                flags.push("ase");
             }
-            Attribute::NeverExtractable(val) => {
-                if val {
-                    flags.push("nxt");
-                }
+            Attribute::NeverExtractable(true) => {
+                flags.push("nxt");
             }
-            Attribute::Extractable(val) => {
-                if !val {
-                    flags.push("XTR");
-                }
+            Attribute::Extractable(false) => {
+                flags.push("XTR");
             }
             Attribute::ModulusBits(bits) => {
                 key_size = Some(usize::from(bits));
             }
-            Attribute::ValueLen(len) => {
-                if key_size.is_none() {
-                    key_size = Some(usize::from(len) * 8); // Convert bytes to bits
-                }
+            Attribute::ValueLen(len) if key_size.is_none() => {
+                key_size = Some(usize::from(len) * 8); // Convert bytes to bits
             }
             _ => {}
         }
@@ -462,10 +436,8 @@ fn extract_object_info(
             Attribute::ModulusBits(bits) => {
                 key_size = Some(usize::from(bits));
             }
-            Attribute::ValueLen(len) => {
-                if key_size.is_none() {
-                    key_size = Some(usize::from(len) * 8);
-                }
+            Attribute::ValueLen(len) if key_size.is_none() => {
+                key_size = Some(usize::from(len) * 8);
             }
             _ => {}
         }
