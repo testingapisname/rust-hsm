@@ -59,8 +59,9 @@ RUN cargo test --release -p observe-core && \
 # Run clippy lints
 RUN cargo clippy --all-features --workspace -- -D warnings
 
-# Run tests
-RUN cd crates/rust-hsm-cli && cargo test --release
+# Run unit tests (integration tests in tests/ require a running HSM provider;
+# run them inside the container with: cargo test -p rust-hsm-cli --tests)
+RUN cd crates/rust-hsm-cli && cargo test --release --lib --bins
 
 # Kryoptic build stage (DISABLED - uncomment to enable Kryoptic support)
 # This stage takes ~2-5 minutes due to OpenSSL compilation
