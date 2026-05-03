@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777172965789,
+  "lastUpdate": 1777777828224,
   "repoUrl": "https://github.com/testingapisname/rust-hsm",
   "entries": {
     "HSM Performance Benchmarks": [
@@ -3581,6 +3581,138 @@ window.BENCHMARK_DATA = {
           {
             "name": "SHA-256 Hash (1MB)",
             "value": 1346.867737857516,
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "James Eilers",
+            "username": "testingapisname",
+            "email": "eilersjames15@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "f4879c15c54663646d3d626be875cc424f81a4a3",
+          "message": "Merge pull request #4 from testingapisname/copilot/fix-pipeline-error\n\nfix: collapse match arms to satisfy clippy collapsible_match in objects.rs",
+          "timestamp": "2026-04-17T21:20:49Z",
+          "url": "https://github.com/testingapisname/rust-hsm/commit/f4879c15c54663646d3d626be875cc424f81a4a3"
+        },
+        "date": 1777777828014,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "RSA-2048 Sign",
+            "value": 847.2066098517489,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-4096 Sign",
+            "value": 157.37613394265134,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-256 Sign",
+            "value": 12214.241708117732,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-384 Sign",
+            "value": 951.3707235220019,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Verify",
+            "value": 16624.07578450676,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P256 Verify",
+            "value": 8105.268635349962,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Encrypt",
+            "value": 16628.620383229834,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 26287.274698340378,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 317176.36909179715,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-384 Hash (1KB)",
+            "value": 227422.61945373088,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-512 Hash (1KB)",
+            "value": 236068.4220714532,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "HMAC-SHA256",
+            "value": 28829.82618497793,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-CMAC",
+            "value": 29421.092922991465,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "Random (32 bytes)",
+            "value": 507923.60828931327,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 26314.86152856715,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 315157.1688801205,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (10KB)",
+            "value": 22105.80812423818,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (10KB)",
+            "value": 99072.87602614732,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (100KB)",
+            "value": 4555.286925224145,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (100KB)",
+            "value": 12460.03754458513,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1MB)",
+            "value": 351.2374664949312,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1MB)",
+            "value": 1234.941554908984,
             "unit": "ops/sec"
           }
         ]
