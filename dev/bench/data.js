@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789265736833,
+  "lastUpdate": 1789870538632,
   "repoUrl": "https://github.com/testingapisname/rust-hsm",
   "entries": {
     "HSM Performance Benchmarks": [
@@ -6221,6 +6221,138 @@ window.BENCHMARK_DATA = {
           {
             "name": "SHA-256 Hash (1MB)",
             "value": 1353.5587495932557,
+            "unit": "ops/sec"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "James Eilers",
+            "username": "testingapisname",
+            "email": "eilersjames15@gmail.com"
+          },
+          "committer": {
+            "name": "James Eilers",
+            "username": "testingapisname",
+            "email": "eilersjames15@gmail.com"
+          },
+          "id": "94d007b1ee9bf4d9e8b0ad1871eab371a081eadd",
+          "message": "fix: ignore unpatched transitive lru advisory",
+          "timestamp": "2026-08-15T03:35:28Z",
+          "url": "https://github.com/testingapisname/rust-hsm/commit/94d007b1ee9bf4d9e8b0ad1871eab371a081eadd"
+        },
+        "date": 1789870537952,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "RSA-2048 Sign",
+            "value": 1705.0137908335457,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-4096 Sign",
+            "value": 200.6813936038425,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-256 Sign",
+            "value": 15918.689879087999,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P-384 Sign",
+            "value": 1198.5691577280575,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Verify",
+            "value": 21155.48733145952,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "ECDSA-P256 Verify",
+            "value": 10482.356098215483,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "RSA-2048 Encrypt",
+            "value": 21356.021971075403,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 33720.89886428013,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 394293.7804099078,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-384 Hash (1KB)",
+            "value": 295504.7812673609,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-512 Hash (1KB)",
+            "value": 282065.16833649244,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "HMAC-SHA256",
+            "value": 37047.410311924374,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-CMAC",
+            "value": 37971.0402470244,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "Random (32 bytes)",
+            "value": 624219.7253433209,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1KB)",
+            "value": 32507.99859305382,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1KB)",
+            "value": 393827.9287013918,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (10KB)",
+            "value": 28487.480037398363,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (10KB)",
+            "value": 123755.63706926852,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (100KB)",
+            "value": 5766.696749601377,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (100KB)",
+            "value": 16042.006957739257,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "AES-256-GCM Encrypt (1MB)",
+            "value": 443.86455217524394,
+            "unit": "ops/sec"
+          },
+          {
+            "name": "SHA-256 Hash (1MB)",
+            "value": 1586.3670911827305,
             "unit": "ops/sec"
           }
         ]
